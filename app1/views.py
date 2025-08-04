@@ -5,6 +5,10 @@ from .models import AccUser, Misel
 from datetime import datetime, timedelta
 import jwt
 from django.conf import settings
+from .models import AccUser, Misel, AccMaster, AccLedgers, AccInvmast
+
+
+
 
 @api_view(['POST'])
 def login(request):
@@ -123,3 +127,196 @@ def test_token(request):
         'all_headers': {k: v for k, v in request.META.items() if 'HTTP_' in k},
         'method': request.method,
     })
+
+
+
+
+
+
+
+
+@api_view(['GET'])
+def get_debtors_data(request):
+    """Get joined data from AccMaster, AccLedgers, and AccInvmast tables for logged user's client_id with pagination"""
+    from django.db import connection
+    from django.core.paginator import Paginator
+    import math
+    
+    try:
+        # Get token from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return Response({'success': False, 'error': 'Missing or invalid authorization header'}, status=401)
+        
+        token = auth_header.split(' ')[1]
+        
+        try:
+            # Decode the JWT token
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            client_id = payload.get('client_id')
+            
+            if not client_id:
+                return Response({'success': False, 'error': 'Invalid token: missing client_id'}, status=401)
+                
+        except jwt.ExpiredSignatureError:
+            return Response({'success': False, 'error': 'Token has expired'}, status=401)
+        except jwt.InvalidTokenError as e:
+            return Response({'success': False, 'error': f'Invalid token: {str(e)}'}, status=401)
+        
+        # Get pagination parameters
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 20))
+        
+        # Calculate offset
+        offset = (page - 1) * page_size
+        
+        # First, get the total count
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT COUNT(DISTINCT am.code)
+                FROM acc_master am
+                WHERE am.client_id = %s
+            """, [client_id])
+            
+            total_records = cursor.fetchone()[0]
+        
+        # Calculate total pages
+        total_pages = math.ceil(total_records / page_size)
+        
+        # Main query with pagination - Group data by account code
+        with connection.cursor() as cursor:
+            cursor.execute("""
+            SELECT 
+                am.code,
+                am.name,
+                am.opening_balance,
+                am.debit as master_debit,
+                am.credit as master_credit,
+                am.place,
+                am.phone2,
+                am.openingdepartment,
+                
+                -- Latest ledger entry
+                (SELECT al.particulars 
+                FROM acc_ledgers al 
+                WHERE al.code = am.code AND al.client_id = am.client_id 
+                ORDER BY al.entry_date DESC, al.id DESC 
+                LIMIT 1) as latest_particulars,
+                
+                (SELECT al.debit 
+                FROM acc_ledgers al 
+                WHERE al.code = am.code AND al.client_id = am.client_id 
+                ORDER BY al.entry_date DESC, al.id DESC 
+                LIMIT 1) as latest_ledger_debit,
+                
+                (SELECT al.credit 
+                FROM acc_ledgers al 
+                WHERE al.code = am.code AND al.client_id = am.client_id 
+                ORDER BY al.entry_date DESC, al.id DESC 
+                LIMIT 1) as latest_ledger_credit,
+                
+                (SELECT al.entry_mode 
+                FROM acc_ledgers al 
+                WHERE al.code = am.code AND al.client_id = am.client_id 
+                ORDER BY al.entry_date DESC, al.id DESC 
+                LIMIT 1) as latest_entry_mode,
+                
+                (SELECT al.entry_date 
+                FROM acc_ledgers al 
+                WHERE al.code = am.code AND al.client_id = am.client_id 
+                ORDER BY al.entry_date DESC, al.id DESC 
+                LIMIT 1) as latest_entry_date,
+                
+                (SELECT al.voucher_no 
+                FROM acc_ledgers al 
+                WHERE al.code = am.code AND al.client_id = am.client_id 
+                ORDER BY al.entry_date DESC, al.id DESC 
+                LIMIT 1) as latest_voucher_no,
+                
+                (SELECT al.narration 
+                FROM acc_ledgers al 
+                WHERE al.code = am.code AND al.client_id = am.client_id 
+                ORDER BY al.entry_date DESC, al.id DESC 
+                LIMIT 1) as latest_narration,
+                
+                -- Latest invoice data
+                (SELECT ai.modeofpayment 
+                FROM acc_invmast ai 
+                WHERE ai.customerid = am.code AND ai.client_id = am.client_id 
+                ORDER BY ai.invdate DESC, ai.id DESC 
+                LIMIT 1) as latest_payment_mode,
+                
+                (SELECT ai.invdate 
+                FROM acc_invmast ai 
+                WHERE ai.customerid = am.code AND ai.client_id = am.client_id 
+                ORDER BY ai.invdate DESC, ai.id DESC 
+                LIMIT 1) as latest_invoice_date,
+                
+                (SELECT ai.nettotal 
+                FROM acc_invmast ai 
+                WHERE ai.customerid = am.code AND ai.client_id = am.client_id 
+                ORDER BY ai.invdate DESC, ai.id DESC 
+                LIMIT 1) as latest_nettotal,
+                
+                (SELECT ai.paid 
+                FROM acc_invmast ai 
+                WHERE ai.customerid = am.code AND ai.client_id = am.client_id 
+                ORDER BY ai.invdate DESC, ai.id DESC 
+                LIMIT 1) as latest_paid,
+                
+                (SELECT ai.bill_ref 
+                FROM acc_invmast ai 
+                WHERE ai.customerid = am.code AND ai.client_id = am.client_id 
+                ORDER BY ai.invdate DESC, ai.id DESC 
+                LIMIT 1) as latest_bill_ref,
+                
+                -- Total outstanding balance from all invoices
+                COALESCE((SELECT SUM(COALESCE(ai.nettotal, 0) - COALESCE(ai.paid, 0))
+                        FROM acc_invmast ai 
+                        WHERE ai.customerid = am.code AND ai.client_id = am.client_id), 0) as total_outstanding_balance,
+                
+                -- Count of ledger entries
+                (SELECT COUNT(*) 
+                FROM acc_ledgers al 
+                WHERE al.code = am.code AND al.client_id = am.client_id) as ledger_count,
+                
+                -- Count of invoices
+                (SELECT COUNT(*) 
+                FROM acc_invmast ai 
+                WHERE ai.customerid = am.code AND ai.client_id = am.client_id) as invoice_count
+                
+            FROM acc_master am
+            WHERE am.client_id = %s
+            ORDER BY am.code
+            LIMIT %s OFFSET %s
+        """, [client_id, page_size, offset])
+            
+            columns = [col[0] for col in cursor.description]
+            results = []
+            
+            for row in cursor.fetchall():
+                row_data = dict(zip(columns, row))
+                # Calculate latest invoice balance
+                if row_data['latest_nettotal'] and row_data['latest_paid']:
+                    row_data['latest_invoice_balance'] = float(row_data['latest_nettotal']) - float(row_data['latest_paid'])
+                else:
+                    row_data['latest_invoice_balance'] = 0.0
+                
+                results.append(row_data)
+        
+        return Response({
+            'success': True, 
+            'data': results,
+            'pagination': {
+                'current_page': page,
+                'total_pages': total_pages,
+                'total_records': total_records,
+                'page_size': page_size,
+                'has_next': page < total_pages,
+                'has_previous': page > 1
+            }
+        })
+        
+    except Exception as e:
+        return Response({'success': False, 'error': str(e)}, status=500)
