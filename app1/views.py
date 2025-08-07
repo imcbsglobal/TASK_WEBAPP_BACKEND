@@ -319,3 +319,9 @@ def get_invoice_details(request):
         
     except Exception as e:
         return Response({'success': False, 'error': str(e)}, status=500)
+    
+
+
+
+
+# jh
