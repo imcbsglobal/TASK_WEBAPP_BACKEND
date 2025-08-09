@@ -108,3 +108,5 @@ class AccInvmast(models.Model):
     class Meta:
         db_table = 'acc_invmast'
         managed = False  # Since the table alrea
+
+
