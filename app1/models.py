@@ -110,3 +110,24 @@ class AccInvmast(models.Model):
         managed = False  # Since the table alrea
 
 
+
+class CashAndBankAccMaster(models.Model):
+    """
+    Cash and Bank Account Master table
+    Stores cash and bank account information
+    super_code determines if it's CASH or BANK
+    """
+    id = models.AutoField(primary_key=True)
+    code = models.CharField(max_length=30)
+    name = models.CharField(max_length=250)
+    super_code = models.CharField(max_length=5, blank=True, null=True)  # CASH or BANK
+    opening_balance = models.DecimalField(max_digits=15, decimal_places=3, blank=True, null=True)
+    opening_date = models.DateField(blank=True, null=True)
+    debit = models.DecimalField(max_digits=15, decimal_places=3, blank=True, null=True)
+    credit = models.DecimalField(max_digits=15, decimal_places=3, blank=True, null=True)
+    client_id = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'cashandbankaccmaster'
+        managed = False  # Since the table already exists
+        unique_together = ('code', 'client_id')

@@ -8,7 +8,9 @@ from .views import (
     test_token, 
     get_debtors_data,
     get_ledger_details,
-    get_invoice_details
+    get_invoice_details,
+    get_cash_book_data,
+    get_bank_book_data
 )
 
 
@@ -20,4 +22,7 @@ urlpatterns = [
     path('get-debtors-data/',   get_debtors_data,   name='get_debtors_data'),
     path('get-ledger-details/', get_ledger_details, name='get_ledger_details'),
     path('get-invoice-details/', get_invoice_details, name='get_invoice_details'),
+
+    path('get-cash-book-data/',  get_cash_book_data,  name='get_cash_book_data'),
+    path('get-bank-book-data/',  get_bank_book_data,  name='get_bank_book_data'),
 ]

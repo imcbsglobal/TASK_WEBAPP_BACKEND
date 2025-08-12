@@ -5,7 +5,8 @@ from .models import AccUser, Misel
 from datetime import datetime, timedelta
 import jwt
 from django.conf import settings
-from .models import AccUser, Misel, AccMaster, AccLedgers, AccInvmast
+from .models import AccUser, Misel, AccMaster, AccLedgers, AccInvmast,CashAndBankAccMaster
+
 
 
 
@@ -21,12 +22,16 @@ def login(request):
         return Response({'success': False, 'error': 'Missing credentials'}, status=400)
 
     try:
-        user = AccUser.objects.get(id=username, password=password)
+        # Include client_id in the initial query to avoid MultipleObjectsReturned error
+        user = AccUser.objects.get(id=username, password=password, client_id=client_id)
     except AccUser.DoesNotExist:
         return Response({'success': False, 'error': 'Invalid credentials'}, status=401)
+    except AccUser.MultipleObjectsReturned:
+        return Response({'success': False, 'error': 'Multiple users found with these credentials'}, status=401)
 
-    if client_id != user.client_id:
-        return Response({'success': False, 'error': 'Invalid client ID'}, status=401)
+    # Remove the redundant client_id check since it's now part of the query
+    # if client_id != user.client_id:
+    #     return Response({'success': False, 'error': 'Invalid client ID'}, status=401)
 
     if account_code and account_code != user.accountcode:
         return Response({'success': False, 'error': 'Invalid account code'}, status=401)
@@ -324,4 +329,136 @@ def get_invoice_details(request):
 
 
 
-# jh
+
+@api_view(['GET'])
+def get_cash_book_data(request):
+    """Get cash book data - accounts with super_code='CASH' for logged user's client_id"""
+    try:
+        # Get token from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return Response({'success': False, 'error': 'Missing or invalid authorization header'}, status=401)
+        
+        token = auth_header.split(' ')[1]
+        
+        try:
+            # Decode the JWT token
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            client_id = payload.get('client_id')
+            
+            if not client_id:
+                return Response({'success': False, 'error': 'Invalid token: missing client_id'}, status=401)
+                
+        except jwt.ExpiredSignatureError:
+            return Response({'success': False, 'error': 'Token has expired'}, status=401)
+        except jwt.InvalidTokenError as e:
+            return Response({'success': False, 'error': f'Invalid token: {str(e)}'}, status=401)
+        
+        # Get pagination parameters
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 20))
+        
+        # Calculate offset
+        offset = (page - 1) * page_size
+        
+        # Get cash accounts (super_code='CASH')
+        cash_accounts = CashAndBankAccMaster.objects.filter(
+            client_id=client_id,
+            super_code='CASH'
+        ).values(
+            'code', 'name', 'opening_balance', 'opening_date',
+            'debit', 'credit'
+        ).order_by('code')[offset:offset + page_size]
+        
+        # Get total count for pagination
+        total_records = CashAndBankAccMaster.objects.filter(
+            client_id=client_id,
+            super_code='CASH'
+        ).count()
+        
+        import math
+        total_pages = math.ceil(total_records / page_size)
+        
+        return Response({
+            'success': True, 
+            'data': list(cash_accounts),
+            'pagination': {
+                'current_page': page,
+                'total_pages': total_pages,
+                'total_records': total_records,
+                'page_size': page_size,
+                'has_next': page < total_pages,
+                'has_previous': page > 1
+            }
+        })
+        
+    except Exception as e:
+        return Response({'success': False, 'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+def get_bank_book_data(request):
+    """Get bank book data - accounts with super_code='BANK' for logged user's client_id"""
+    try:
+        # Get token from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return Response({'success': False, 'error': 'Missing or invalid authorization header'}, status=401)
+        
+        token = auth_header.split(' ')[1]
+        
+        try:
+            # Decode the JWT token
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            client_id = payload.get('client_id')
+            
+            if not client_id:
+                return Response({'success': False, 'error': 'Invalid token: missing client_id'}, status=401)
+                
+        except jwt.ExpiredSignatureError:
+            return Response({'success': False, 'error': 'Token has expired'}, status=401)
+        except jwt.InvalidTokenError as e:
+            return Response({'success': False, 'error': f'Invalid token: {str(e)}'}, status=401)
+        
+        # Get pagination parameters
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 20))
+        
+        # Calculate offset
+        offset = (page - 1) * page_size
+        
+        # Get bank accounts (super_code='BANK')
+        bank_accounts = CashAndBankAccMaster.objects.filter(
+            client_id=client_id,
+            super_code='BANK'
+        ).values(
+            'code', 'name', 'opening_balance', 'opening_date',
+            'debit', 'credit'
+        ).order_by('code')[offset:offset + page_size]
+        
+        # Get total count for pagination
+        total_records = CashAndBankAccMaster.objects.filter(
+            client_id=client_id,
+            super_code='BANK'
+        ).count()
+        
+        import math
+        total_pages = math.ceil(total_records / page_size)
+        
+        return Response({
+            'success': True, 
+            'data': list(bank_accounts),
+            'pagination': {
+                'current_page': page,
+                'total_pages': total_pages,
+                'total_records': total_records,
+                'page_size': page_size,
+                'has_next': page < total_pages,
+                'has_previous': page > 1
+            }
+        })
+        
+    except Exception as e:
+        return Response({'success': False, 'error': str(e)}, status=500)
