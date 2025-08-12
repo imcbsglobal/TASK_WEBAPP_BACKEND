@@ -44,7 +44,8 @@ INSTALLED_APPS = [
 
 # Add at the bottom
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Default Vite port
+    "http://localhost:5173",
+    "https://taskweb.imcbs.com",  # Your production frontend URL
 ]
 from datetime import timedelta
 
