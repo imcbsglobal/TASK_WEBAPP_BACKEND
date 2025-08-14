@@ -141,7 +141,7 @@ def test_token(request):
 
 @api_view(['GET'])
 def get_debtors_data(request):
-    """Get joined data from AccMaster, AccLedgers, and AccInvmast tables for logged user's client_id with pagination"""
+    """Get joined data from AccMaster, AccLedgers, and AccInvmast tables for logged user's client_id with pagination and search"""
     from django.db import connection
     from django.core.paginator import Paginator
     import math
@@ -171,41 +171,65 @@ def get_debtors_data(request):
         # Get pagination parameters
         page = int(request.GET.get('page', 1))
         page_size = int(request.GET.get('page_size', 20))
+        search_term = request.GET.get('search', '').strip()
         
         # Calculate offset
         offset = (page - 1) * page_size
         
-        # First, get the total count
+        # Build the WHERE clause for search
+        search_condition = ""
+        search_params = [client_id]
+        
+        if search_term:
+            # Search in name, code, and place fields (case-insensitive)
+            search_condition = """
+                AND (
+                    UPPER(am.name) LIKE UPPER(%s) OR 
+                    UPPER(am.code) LIKE UPPER(%s) OR 
+                    UPPER(am.place) LIKE UPPER(%s)
+                )
+            """
+            search_pattern = f"%{search_term}%"
+            search_params.extend([search_pattern, search_pattern, search_pattern])
+        
+        # First, get the total count with search filter
+        count_query = f"""
+            SELECT COUNT(DISTINCT am.code)
+            FROM acc_master am
+            WHERE am.client_id = %s
+            {search_condition}
+        """
+        
         with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT COUNT(DISTINCT am.code)
-                FROM acc_master am
-                WHERE am.client_id = %s
-            """, [client_id])
-            
+            cursor.execute(count_query, search_params)
             total_records = cursor.fetchone()[0]
         
         # Calculate total pages
-        total_pages = math.ceil(total_records / page_size)
+        total_pages = math.ceil(total_records / page_size) if total_records > 0 else 1
         
-        # Simplified query - just get account master data
+        # Main query with search filter
+        main_query = f"""
+            SELECT 
+                am.code,
+                am.name,
+                am.opening_balance,
+                am.debit as master_debit,
+                am.credit as master_credit,
+                am.place,
+                am.phone2,
+                am.openingdepartment
+            FROM acc_master am
+            WHERE am.client_id = %s
+            {search_condition}
+            ORDER BY am.code
+            LIMIT %s OFFSET %s
+        """
+        
+        # Add limit and offset parameters
+        query_params = search_params + [page_size, offset]
+        
         with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT 
-                    am.code,
-                    am.name,
-                    am.opening_balance,
-                    am.debit as master_debit,
-                    am.credit as master_credit,
-                    am.place,
-                    am.phone2,
-                    am.openingdepartment
-                FROM acc_master am
-                WHERE am.client_id = %s
-                ORDER BY am.code
-                LIMIT %s OFFSET %s
-            """, [client_id, page_size, offset])
-            
+            cursor.execute(main_query, query_params)
             columns = [col[0] for col in cursor.description]
             results = []
             
@@ -223,12 +247,13 @@ def get_debtors_data(request):
                 'page_size': page_size,
                 'has_next': page < total_pages,
                 'has_previous': page > 1
-            }
+            },
+            'search_applied': bool(search_term),
+            'search_term': search_term
         })
         
     except Exception as e:
         return Response({'success': False, 'error': str(e)}, status=500)
-
 
 @api_view(['GET'])
 def get_ledger_details(request):
@@ -458,6 +483,127 @@ def get_bank_book_data(request):
                 'has_next': page < total_pages,
                 'has_previous': page > 1
             }
+        })
+        
+    except Exception as e:
+        return Response({'success': False, 'error': str(e)}, status=500)
+    
+
+
+
+
+
+
+@api_view(['GET'])
+def get_cash_ledger_details(request):
+    """Get detailed ledger entries for a specific cash account"""
+    try:
+        # Get token from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return Response({'success': False, 'error': 'Missing or invalid authorization header'}, status=401)
+        
+        token = auth_header.split(' ')[1]
+        
+        try:
+            # Decode the JWT token
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            client_id = payload.get('client_id')
+            
+            if not client_id:
+                return Response({'success': False, 'error': 'Invalid token: missing client_id'}, status=401)
+                
+        except jwt.ExpiredSignatureError:
+            return Response({'success': False, 'error': 'Token has expired'}, status=401)
+        except jwt.InvalidTokenError as e:
+            return Response({'success': False, 'error': f'Invalid token: {str(e)}'}, status=401)
+        
+        # Get account code from query parameters
+        account_code = request.GET.get('account_code')
+        if not account_code:
+            return Response({'success': False, 'error': 'Missing account_code parameter'}, status=400)
+        
+        # Verify that this is a cash account before fetching ledger data
+        cash_account_exists = CashAndBankAccMaster.objects.filter(
+            code=account_code,
+            client_id=client_id,
+            super_code='CASH'
+        ).exists()
+        
+        if not cash_account_exists:
+            return Response({'success': False, 'error': 'Cash account not found'}, status=404)
+        
+        # Fetch all ledger entries for the specific cash account
+        ledger_entries = AccLedgers.objects.filter(
+            code=account_code, 
+            client_id=client_id
+        ).values(
+            'entry_date', 'particulars', 'voucher_no', 'entry_mode', 
+            'debit', 'credit', 'narration'
+        ).order_by('-entry_date', '-id')
+        
+        return Response({
+            'success': True, 
+            'data': list(ledger_entries)
+        })
+        
+    except Exception as e:
+        return Response({'success': False, 'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+def get_bank_ledger_details(request):
+    """Get detailed ledger entries for a specific bank account"""
+    try:
+        # Get token from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return Response({'success': False, 'error': 'Missing or invalid authorization header'}, status=401)
+        
+        token = auth_header.split(' ')[1]
+        
+        try:
+            # Decode the JWT token
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            client_id = payload.get('client_id')
+            
+            if not client_id:
+                return Response({'success': False, 'error': 'Invalid token: missing client_id'}, status=401)
+                
+        except jwt.ExpiredSignatureError:
+            return Response({'success': False, 'error': 'Token has expired'}, status=401)
+        except jwt.InvalidTokenError as e:
+            return Response({'success': False, 'error': f'Invalid token: {str(e)}'}, status=401)
+        
+        # Get account code from query parameters
+        account_code = request.GET.get('account_code')
+        if not account_code:
+            return Response({'success': False, 'error': 'Missing account_code parameter'}, status=400)
+        
+        # Verify that this is a bank account before fetching ledger data
+        bank_account_exists = CashAndBankAccMaster.objects.filter(
+            code=account_code,
+            client_id=client_id,
+            super_code='BANK'
+        ).exists()
+        
+        if not bank_account_exists:
+            return Response({'success': False, 'error': 'Bank account not found'}, status=404)
+        
+        # Fetch all ledger entries for the specific bank account
+        ledger_entries = AccLedgers.objects.filter(
+            code=account_code, 
+            client_id=client_id
+        ).values(
+            'entry_date', 'particulars', 'voucher_no', 'entry_mode', 
+            'debit', 'credit', 'narration'
+        ).order_by('-entry_date', '-id')
+        
+        return Response({
+            'success': True, 
+            'data': list(ledger_entries)
         })
         
     except Exception as e:

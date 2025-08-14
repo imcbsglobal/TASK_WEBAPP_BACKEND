@@ -10,7 +10,9 @@ from .views import (
     get_ledger_details,
     get_invoice_details,
     get_cash_book_data,
-    get_bank_book_data
+    get_bank_book_data,
+    get_bank_ledger_details,
+    get_cash_ledger_details
 )
 
 
@@ -25,4 +27,6 @@ urlpatterns = [
 
     path('get-cash-book-data/',  get_cash_book_data,  name='get_cash_book_data'),
     path('get-bank-book-data/',  get_bank_book_data,  name='get_bank_book_data'),
+    path('get-cash-ledger-details/', get_cash_ledger_details, name='get_cash_ledger_details'),
+    path('get-bank-ledger-details/', get_bank_ledger_details, name='get_bank_ledger_details'),
 ]
