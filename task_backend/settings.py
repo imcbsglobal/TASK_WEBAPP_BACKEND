@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-%czi_^6texrx)h7@d#x58rp7s#(jl*#idtou14ol%-_%z=)bm4
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['taskweb.imcbs.com','127.0.0.1']
+ALLOWED_HOSTS = ['taskcloud.imcbs.com','127.0.0.1']
 
 
 # Application definition
@@ -45,7 +45,7 @@ INSTALLED_APPS = [
 # Add at the bottom
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "https://taskweb.imcbs.com",  # Your production frontend URL
+    "https://taskcloud.imcbs.com",  # Your production frontend URL
 ]
 from datetime import timedelta
 
