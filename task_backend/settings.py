@@ -28,6 +28,9 @@ DEBUG = True
 ALLOWED_HOSTS = ['taskcloud.imcbs.com','127.0.0.1']
 
 
+CORS_ALLOW_HEADERS = ['*']
+CORS_ALLOW_METHODS = ['*']
+
 # Application definition
 
 INSTALLED_APPS = [
