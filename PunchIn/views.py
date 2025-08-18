@@ -57,16 +57,26 @@ def punch_in(request):
     return Response({'success': True, 'data': serializer.data}, status=201 if created else 200)
 
 
+from .models import PunchIn
+from app1.models import Misel
+
 @api_view(['GET'])
 def get_firms(request):
     client_id = get_client_id_from_token(request)
     if not client_id:
         return Response({'error': 'Invalid or missing token'}, status=401)
 
- firms = Misel.objects.filter(client_id=client_id).values(
-        'id',
-        'firm_name',
-        'latitude',
-        'longitude'
-    )
-    return Response({'success': True, 'firms': list(firms)})
+    firms = Misel.objects.filter(client_id=client_id)
+
+    data = []
+    for firm in firms:
+        # get latest punch-in record for this firm
+        punch = PunchIn.objects.filter(firm=firm, client_id=client_id).order_by('-created_at').first()
+        data.append({
+            'id': firm.id,
+            'firm_name': firm.firm_name,
+            'latitude': float(punch.latitude) if punch else None,
+            'longitude': float(punch.longitude) if punch else None,
+        })
+
+    return Response({'success': True, 'firms': data})
