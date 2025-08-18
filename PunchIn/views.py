@@ -63,5 +63,10 @@ def get_firms(request):
     if not client_id:
         return Response({'error': 'Invalid or missing token'}, status=401)
 
-    firms = Misel.objects.filter(client_id=client_id).values('id', 'firm_name')
+ firms = Misel.objects.filter(client_id=client_id).values(
+        'id',
+        'firm_name',
+        'latitude',
+        'longitude'
+    )
     return Response({'success': True, 'firms': list(firms)})
