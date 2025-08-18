@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 import jwt
-from .models import PunchIn
-from .serializers import PunchInSerializer
+from .models import ShopLocation
+from .serializers import ShopLocationSerializer
 from app1.models import Misel  # import existing Misel
 
 def get_client_id_from_token(request):
@@ -19,7 +19,7 @@ def get_client_id_from_token(request):
         return None
 
 @api_view(['POST'])
-def punch_in(request):
+def shop_location(request):
     client_id = get_client_id_from_token(request)
     if not client_id:
         return Response({'error': 'Invalid or missing token'}, status=401)
@@ -32,13 +32,11 @@ def punch_in(request):
         return Response({'error': 'firm_name, latitude, longitude required'}, status=400)
 
     try:
-        # Try to find the firm by firm_name and client_id
         firm = Misel.objects.get(firm_name=firm_name, client_id=client_id)
     except Misel.DoesNotExist:
         return Response({'error': 'Invalid firm for this client'}, status=404)
 
-    # Check if a PunchIn entry already exists for this firm and client_id
-    punch, created = PunchIn.objects.get_or_create(
+    shop, created = ShopLocation.objects.get_or_create(
         firm=firm,
         client_id=client_id,
         defaults={
@@ -47,18 +45,14 @@ def punch_in(request):
         }
     )
 
-    # If the entry already exists, update the latitude and longitude
     if not created:
-        punch.latitude = latitude
-        punch.longitude = longitude
-        punch.save()
+        shop.latitude = latitude
+        shop.longitude = longitude
+        shop.save()
 
-    serializer = PunchInSerializer(punch)
+    serializer = ShopLocationSerializer(shop)
     return Response({'success': True, 'data': serializer.data}, status=201 if created else 200)
 
-
-from .models import PunchIn
-from app1.models import Misel
 
 @api_view(['GET'])
 def get_firms(request):
@@ -70,13 +64,12 @@ def get_firms(request):
 
     data = []
     for firm in firms:
-        # get latest punch-in record for this firm
-        punch = PunchIn.objects.filter(firm=firm, client_id=client_id).order_by('-created_at').first()
+        shop = ShopLocation.objects.filter(firm=firm, client_id=client_id).order_by('-created_at').first()
         data.append({
             'id': firm.id,
             'firm_name': firm.firm_name,
-            'latitude': float(punch.latitude) if punch else None,
-            'longitude': float(punch.longitude) if punch else None,
+            'latitude': float(shop.latitude) if shop else None,
+            'longitude': float(shop.longitude) if shop else None,
         })
 
     return Response({'success': True, 'firms': data})
