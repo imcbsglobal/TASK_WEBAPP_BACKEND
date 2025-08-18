@@ -62,6 +62,7 @@ class AccMaster(models.Model):
     place = models.CharField(max_length=100, blank=True, null=True)#
     phone2 = models.CharField(max_length=60, blank=True, null=True)#
     openingdepartment = models.CharField(max_length=100, blank=True, null=True)
+    area = models.CharField(max_length=200, blank=True, null=True)
     client_id = models.CharField(max_length=100)
 
     class Meta:

@@ -30,3 +30,27 @@ urlpatterns = [
     path('get-cash-ledger-details/', get_cash_ledger_details, name='get_cash_ledger_details'),
     path('get-bank-ledger-details/', get_bank_ledger_details, name='get_bank_ledger_details'),
 ]
+
+
+
+# http://127.0.0.1:8000/api/login/
+
+
+# {
+#     "username": "ARUN",
+#     "password": "Ford@123##",
+#     "client_id": "SYSMAC"
+    
+# }
+
+# {
+#     "success": true,
+#     "user": {
+#         "username": "ARUN",
+#         "role": "User",
+#         "client_id": "SYSMAC",
+#         "accountcode": "ACASH",
+#         "login_time": "2025-08-16 16:41:14"
+#     },
+#     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiQVJVTiIsInVzZXJuYW1lIjoiQVJVTiIsImNsaWVudF9pZCI6IlNZU01BQyIsInJvbGUiOiJVc2VyIiwiYWNjb3VudGNvZGUiOiJBQ0FTSCIsImV4cCI6MTc1NTQyOTA3NCwiaWF0IjoxNzU1MzQyNjc0fQ.wt5-jCNe5cQYOmbnBgjUdMSVo37j5VchBhuDGETSGF4"
+# }
