@@ -107,3 +107,63 @@ def get_firms(request):
         })
 
     return Response({'success': True, 'firms': data})
+
+
+
+# Get Table Datas
+@api_view(['GET'])
+def get_table_data(req):
+    payload = decode_jwt_token(req)
+    client_id = payload.get('client_id')
+    role= payload.get('role')
+    print(payload)
+
+    if not client_id:
+        return Response({'error': 'Invalid or missing token'}, status=401)
+    
+    shops =ShopLocation.objects.filter(client_id=client_id)
+    
+    data=[]
+    for shop in shops:    
+        print("Client shops :",shop)
+        data.append({
+          'id':shop.id,
+          'shop_name': shop.firm.firm_name  if shop.firm else None,
+          'shop_address':shop.firm.address if shop.firm else None,
+          'latitude':float(shop.latitude) if shop.latitude else  None,
+          'longitude':float(shop.longitude) if shop.longitude else  None,
+          'status':shop.status,
+          'created_by': shop.created_by,
+          'created_at': shop.created_at,
+          'client_id': shop.client_id   
+        })
+
+    return Response({'success': True, 'Data':data})
+
+
+
+@api_view(['POST'])
+def update_location_status(req):
+
+    payload =decode_jwt_token(req)
+
+    if not payload:
+        return Response({'error': 'Invalid or missing token'}, status=401)
+        
+
+    client_id=payload.get("client_id")
+    username = payload.get("username")
+
+    newStatus = req.data.get('status')
+    shop_id = req.data.get('shop_id')
+
+    if not newStatus:
+        return Response({"error":'Status is required'},status=400)
+
+    shopLocation = ShopLocation.objects.filter(client_id=client_id,created_by=username,id=shop_id)
+
+    shopLocation.status =status 
+    shopLocation.save()
+
+    return Response({"success":True})
+
