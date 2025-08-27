@@ -6,4 +6,4 @@ class ShopLocationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ShopLocation
-        fields = ['id', 'firm', 'firm_name', 'latitude', 'longitude', 'client_id', 'created_at']
+        fields = ['id', 'firm', 'firm_name', 'latitude', 'longitude', 'client_id', 'created_at','created_by']

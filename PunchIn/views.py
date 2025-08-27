@@ -5,7 +5,7 @@ from django.conf import settings
 import jwt
 from .models import ShopLocation
 from .serializers import ShopLocationSerializer
-from app1.models import Misel  # import existing Misel
+from app1.models import Misel,AccUser  # import existing Misel
 
 def get_client_id_from_token(request):
     auth_header = request.META.get('HTTP_AUTHORIZATION')
@@ -18,9 +18,33 @@ def get_client_id_from_token(request):
     except Exception:
         return None
 
+def decode_jwt_token(request):
+
+    auth_header = request.META.get("HTTP_AUTHORIZATION")
+    
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+    
+    token =auth_header.split(' ')[1]
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        return payload
+    
+    except Exception:
+        return None
+
+
+
+
 @api_view(['POST'])
 def shop_location(request):
-    client_id = get_client_id_from_token(request)
+
+    payload =decode_jwt_token(request)
+
+    client_id=payload.get("client_id")
+    username = payload.get("username")
+
     if not client_id:
         return Response({'error': 'Invalid or missing token'}, status=401)
 
@@ -36,18 +60,25 @@ def shop_location(request):
     except Misel.DoesNotExist:
         return Response({'error': 'Invalid firm for this client'}, status=404)
 
+    
+
     shop, created = ShopLocation.objects.get_or_create(
         firm=firm,
         client_id=client_id,
         defaults={
             'latitude': latitude,
-            'longitude': longitude
-        }
+            'longitude': longitude,
+            "created_by" :username 
+        },
     )
 
     if not created:
         shop.latitude = latitude
         shop.longitude = longitude
+
+        if username:  # optionally update who modified it
+            shop.created_by = username
+
         shop.save()
 
     serializer = ShopLocationSerializer(shop)
@@ -56,7 +87,10 @@ def shop_location(request):
 
 @api_view(['GET'])
 def get_firms(request):
-    client_id = get_client_id_from_token(request)
+
+    payload = decode_jwt_token(request)
+    client_id = payload.get('client_id')
+
     if not client_id:
         return Response({'error': 'Invalid or missing token'}, status=401)
 
