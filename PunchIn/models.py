@@ -11,10 +11,13 @@ class ShopLocation(models.Model):
     ]
 
 
-    firm = models.ForeignKey(AccMaster,
+    firm = models.ForeignKey(
+                            AccMaster,
+                            to_field='code',              # explicit target PK
+                            db_column='firm_code',        # legacy column in DB
                             on_delete=models.CASCADE,
-                            db_column='firm_code' ,
-                            db_constraint=False 
+                            db_constraint=False,
+                            related_name='shop_locations',
                              )  
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
