@@ -36,7 +36,7 @@ def decode_jwt_token(request):
 
 
 
-
+# add shop location
 @api_view(['POST'])
 def shop_location(request):
 
@@ -160,10 +160,15 @@ def update_location_status(req):
     if not newStatus:
         return Response({"error":'Status is required'},status=400)
 
-    shopLocation = ShopLocation.objects.filter(client_id=client_id,created_by=username,id=shop_id)
-
-    shopLocation.status =status 
-    shopLocation.save()
+    if not shop_id :
+        return Response({"error":'ShopId is required'},status=400)
+    
+    try:
+        shopLocation = ShopLocation.objects.get(client_id=client_id,created_by=username,id=shop_id)
+        shopLocation.status =newStatus 
+        shopLocation.save()
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
 
     return Response({"success":True})
 
