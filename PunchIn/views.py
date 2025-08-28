@@ -6,6 +6,8 @@ import jwt
 from .models import ShopLocation
 from .serializers import ShopLocationSerializer
 from app1.models import Misel,AccMaster  # import existing Misel
+from django.db.models import OuterRef, Subquery
+
 
 def get_client_id_from_token(request):
     auth_header = request.META.get('HTTP_AUTHORIZATION')
@@ -95,18 +97,26 @@ def get_firms(request):
     if not client_id:
         return Response({'error': 'Invalid or missing token'}, status=401)
 
-    firms = AccMaster.objects.filter(client_id=client_id)
+    latest_shop = ShopLocation.objects.filter(
+        firm=OuterRef('pk'),
+        client_id=client_id
+    ).order_by('-created_at')
 
-    data = []
-    for firm in firms:
-        shop = ShopLocation.objects.filter(firm=firm, client_id=client_id).order_by('-created_at').first()
-        data.append({
-            'idf': firm.code,
-            'firm_name': firm.name,
-            'latitude': float(shop.latitude) if shop else None,
-            'longitude': float(shop.longitude) if shop else None,
-        })
+    firms = AccMaster.objects.filter(client_id=client_id).annotate(
+        latitude=Subquery(latest_shop.values('latitude')[:1]),
+        longitude=Subquery(latest_shop.values('longitude')[:1]),
+    )
 
+    data=[
+        {
+            'id':firm.code,
+            'firm_name':firm.name,
+            'latitude': float(firm.latitude) if firm.latitude else None,
+            'longitude': float(firm.longitude) if firm.longitude else None,    
+        }
+        for firm in firms
+    ]
+ 
     return Response({'success': True, 'firms': data})
 
 

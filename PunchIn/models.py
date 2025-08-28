@@ -11,9 +11,10 @@ class ShopLocation(models.Model):
     ]
 
 
-    firm = models.ForeignKey(AccMaster, on_delete=models.CASCADE,
-                                db_column='firm_code' ,
-                                db_constraint=False 
+    firm = models.ForeignKey(AccMaster,
+                            on_delete=models.CASCADE,
+                            db_column='firm_code' ,
+                            db_constraint=False 
                              )  
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
@@ -24,3 +25,7 @@ class ShopLocation(models.Model):
 
     class Meta:
         db_table = "shop_location"
+        indexes = [
+            models.Index(fields=["firm", "client_id"], name="idx_firm_client"),
+            models.Index(fields=["created_at"], name="idx_created_at"),
+        ]
