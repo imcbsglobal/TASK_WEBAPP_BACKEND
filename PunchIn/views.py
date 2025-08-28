@@ -5,7 +5,9 @@ from django.conf import settings
 import jwt
 from .models import ShopLocation
 from .serializers import ShopLocationSerializer
-from app1.models import Misel  # import existing Misel
+from app1.models import Misel,AccMaster  # import existing Misel
+from django.db.models import OuterRef, Subquery
+
 
 def get_client_id_from_token(request):
     auth_header = request.META.get('HTTP_AUTHORIZATION')
@@ -18,9 +20,33 @@ def get_client_id_from_token(request):
     except Exception:
         return None
 
+def decode_jwt_token(request):
+
+    auth_header = request.META.get("HTTP_AUTHORIZATION")
+    
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+    
+    token =auth_header.split(' ')[1]
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        return payload
+    
+    except Exception:
+        return None
+
+
+
+# add shop location
 @api_view(['POST'])
 def shop_location(request):
-    client_id = get_client_id_from_token(request)
+
+    payload =decode_jwt_token(request)
+
+    client_id=payload.get("client_id")
+    username = payload.get("username")
+
     if not client_id:
         return Response({'error': 'Invalid or missing token'}, status=401)
 
@@ -32,44 +58,128 @@ def shop_location(request):
         return Response({'error': 'firm_name, latitude, longitude required'}, status=400)
 
     try:
-        firm = Misel.objects.get(firm_name=firm_name, client_id=client_id)
-    except Misel.DoesNotExist:
+        firm = AccMaster.objects.get(name=firm_name, client_id=client_id)
+    except AccMaster.DoesNotExist:
         return Response({'error': 'Invalid firm for this client'}, status=404)
+
+    
 
     shop, created = ShopLocation.objects.get_or_create(
         firm=firm,
         client_id=client_id,
         defaults={
             'latitude': latitude,
-            'longitude': longitude
-        }
+            'longitude': longitude,
+            "created_by" :username 
+        },
     )
 
     if not created:
         shop.latitude = latitude
         shop.longitude = longitude
+
+        if username:  # optionally update who modified it
+            shop.created_by = username
+
         shop.save()
 
     serializer = ShopLocationSerializer(shop)
     return Response({'success': True, 'data': serializer.data}, status=201 if created else 200)
 
 
+# Punchin Drop down data  
 @api_view(['GET'])
 def get_firms(request):
-    client_id = get_client_id_from_token(request)
+
+    payload = decode_jwt_token(request)
+    client_id = payload.get('client_id')
+
     if not client_id:
         return Response({'error': 'Invalid or missing token'}, status=401)
 
-    firms = Misel.objects.filter(client_id=client_id)
+    latest_shop = ShopLocation.objects.filter(
+        firm=OuterRef('pk'),
+        client_id=client_id
+    ).order_by('-created_at')
 
-    data = []
-    for firm in firms:
-        shop = ShopLocation.objects.filter(firm=firm, client_id=client_id).order_by('-created_at').first()
+    firms = AccMaster.objects.filter(client_id=client_id).annotate(
+        latitude=Subquery(latest_shop.values('latitude')[:1]),
+        longitude=Subquery(latest_shop.values('longitude')[:1]),
+    )
+
+    data=[
+        {
+            'id':firm.code,
+            'firm_name':firm.name,
+            'latitude': float(firm.latitude) if firm.latitude else None,
+            'longitude': float(firm.longitude) if firm.longitude else None,    
+        }
+        for firm in firms
+    ]
+ 
+    return Response({'success': True, 'firms': data})
+
+
+
+# Get Table Datas
+@api_view(['GET'])
+def get_table_data(req):
+    payload = decode_jwt_token(req)
+    client_id = payload.get('client_id')
+    role= payload.get('role')
+    print(payload)
+
+    if not client_id:
+        return Response({'error': 'Invalid or missing token'}, status=401)
+    
+    shops =ShopLocation.objects.filter(client_id=client_id)
+    
+    data=[]
+    for shop in shops:    
+        print("Client shops :",shop)
         data.append({
-            'id': firm.id,
-            'firm_name': firm.firm_name,
-            'latitude': float(shop.latitude) if shop else None,
-            'longitude': float(shop.longitude) if shop else None,
+          'id':shop.id,
+          'shop_name': shop.firm.firm_name  if shop.firm else None,
+          'shop_address':shop.firm.address if shop.firm else None,
+          'latitude':float(shop.latitude) if shop.latitude else  None,
+          'longitude':float(shop.longitude) if shop.longitude else  None,
+          'status':shop.status,
+          'created_by': shop.created_by,
+          'created_at': shop.created_at,
+          'client_id': shop.client_id   
         })
 
-    return Response({'success': True, 'firms': data})
+    return Response({'success': True, 'Data':data})
+
+
+
+@api_view(['POST'])
+def update_location_status(req):
+
+    payload =decode_jwt_token(req)
+
+    if not payload:
+        return Response({'error': 'Invalid or missing token'}, status=401)
+        
+
+    client_id=payload.get("client_id")
+    username = payload.get("username")
+
+    newStatus = req.data.get('status')
+    shop_id = req.data.get('shop_id')
+
+    if not newStatus:
+        return Response({"error":'Status is required'},status=400)
+
+    if not shop_id :
+        return Response({"error":'ShopId is required'},status=400)
+    
+    try:
+        shopLocation = ShopLocation.objects.get(client_id=client_id,created_by=username,id=shop_id)
+        shopLocation.status =newStatus 
+        shopLocation.save()
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+    return Response({"success":True})
+
