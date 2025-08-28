@@ -5,7 +5,7 @@ from django.conf import settings
 import jwt
 from .models import ShopLocation
 from .serializers import ShopLocationSerializer
-from app1.models import Misel,AccUser  # import existing Misel
+from app1.models import Misel,AccMaster  # import existing Misel
 
 def get_client_id_from_token(request):
     auth_header = request.META.get('HTTP_AUTHORIZATION')
@@ -56,8 +56,8 @@ def shop_location(request):
         return Response({'error': 'firm_name, latitude, longitude required'}, status=400)
 
     try:
-        firm = Misel.objects.get(firm_name=firm_name, client_id=client_id)
-    except Misel.DoesNotExist:
+        firm = AccMaster.objects.get(name=firm_name, client_id=client_id)
+    except AccMaster.DoesNotExist:
         return Response({'error': 'Invalid firm for this client'}, status=404)
 
     
@@ -85,6 +85,7 @@ def shop_location(request):
     return Response({'success': True, 'data': serializer.data}, status=201 if created else 200)
 
 
+# Punchin Drop down data  
 @api_view(['GET'])
 def get_firms(request):
 
@@ -94,14 +95,14 @@ def get_firms(request):
     if not client_id:
         return Response({'error': 'Invalid or missing token'}, status=401)
 
-    firms = Misel.objects.filter(client_id=client_id)
+    firms = AccMaster.objects.filter(client_id=client_id)
 
     data = []
     for firm in firms:
         shop = ShopLocation.objects.filter(firm=firm, client_id=client_id).order_by('-created_at').first()
         data.append({
-            'id': firm.id,
-            'firm_name': firm.firm_name,
+            'idf': firm.code,
+            'firm_name': firm.name,
             'latitude': float(shop.latitude) if shop else None,
             'longitude': float(shop.longitude) if shop else None,
         })

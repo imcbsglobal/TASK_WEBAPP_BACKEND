@@ -1,5 +1,5 @@
 from django.db import models
-from app1.models import Misel  # import Misel model from your main app
+from app1.models import Misel,AccMaster  # import Misel model from your main app
 
 
 class ShopLocation(models.Model):
@@ -11,7 +11,10 @@ class ShopLocation(models.Model):
     ]
 
 
-    firm = models.ForeignKey(Misel, on_delete=models.CASCADE)  # link to Misel
+    firm = models.ForeignKey(AccMaster, on_delete=models.CASCADE,
+                                db_column='firm_code' ,
+                                db_constraint=False 
+                             )  
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
     client_id = models.CharField(max_length=64)
