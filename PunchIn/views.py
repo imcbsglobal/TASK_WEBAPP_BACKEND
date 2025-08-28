@@ -7,6 +7,8 @@ from .models import ShopLocation
 from .serializers import ShopLocationSerializer
 from app1.models import Misel,AccMaster  # import existing Misel
 from django.db.models import OuterRef, Subquery
+from django.db import DatabaseError
+from django.core.exceptions import ObjectDoesNotExist
 
 
 def get_client_id_from_token(request):
@@ -88,37 +90,68 @@ def shop_location(request):
 
 
 # Punchin Drop down data  
+
 @api_view(['GET'])
 def get_firms(request):
+    try:
+        # Decode token
+        payload = decode_jwt_token(request)
+        client_id = payload.get('client_id')
 
-    payload = decode_jwt_token(request)
-    client_id = payload.get('client_id')
+        if not client_id:
+            return Response(
+                {'error': 'Invalid or missing token'},
+                status=401
+            )
 
-    if not client_id:
-        return Response({'error': 'Invalid or missing token'}, status=401)
+        # Prepare subquery for latest shop location
+        latest_shop = ShopLocation.objects.filter(
+            firm=OuterRef('pk'),
+            client_id=client_id
+        ).order_by('-created_at')
 
-    latest_shop = ShopLocation.objects.filter(
-        firm=OuterRef('pk'),
-        client_id=client_id
-    ).order_by('-created_at')
+        # Fetch firms with latest location
+        firms = AccMaster.objects.filter(client_id=client_id).annotate(
+            latitude=Subquery(latest_shop.values('latitude')[:1]),
+            longitude=Subquery(latest_shop.values('longitude')[:1]),
+        )
 
-    firms = AccMaster.objects.filter(client_id=client_id).annotate(
-        latitude=Subquery(latest_shop.values('latitude')[:1]),
-        longitude=Subquery(latest_shop.values('longitude')[:1]),
-    )
+        # If no firms found
+        if not firms.exists():
+            return Response(
+                {'success': True, 'firms': [], 'message': 'No firms found'},
+                status=200
+            )
 
-    data=[
-        {
-            'id':firm.code,
-            'firm_name':firm.name,
-            'latitude': float(firm.latitude) if firm.latitude else None,
-            'longitude': float(firm.longitude) if firm.longitude else None,    
-        }
-        for firm in firms
-    ]
- 
-    return Response({'success': True, 'firms': data})
+        # Build response data
+        data = [
+            {
+                'id': firm.code,
+                'firm_name': firm.name,
+                'latitude': float(firm.latitude) if firm.latitude is not None else None,
+                'longitude': float(firm.longitude) if firm.longitude is not None else None,
+            }
+            for firm in firms
+        ]
 
+        return Response({'success': True, 'firms': data}, status=200)
+
+    except ObjectDoesNotExist:
+        return Response(
+            {'error': 'Requested resource does not exist'},
+            status=404
+        )
+    except DatabaseError as db_err:
+        return Response(
+            {'error': 'Database error', 'details': str(db_err)},
+            status=500
+        )
+    except Exception as e:
+        # Catch-all for unexpected errors
+        return Response(
+            {'error': 'An unexpected error occurred', 'details': str(e)},
+            status=500
+        )
 
 
 # Get Table Datas
