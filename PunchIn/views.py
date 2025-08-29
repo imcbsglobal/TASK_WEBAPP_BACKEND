@@ -157,33 +157,63 @@ def get_firms(request):
 # Get Table Datas
 @api_view(['GET'])
 def get_table_data(req):
-    payload = decode_jwt_token(req)
-    client_id = payload.get('client_id')
-    role= payload.get('role')
-    print(payload)
 
-    if not client_id:
-        return Response({'error': 'Invalid or missing token'}, status=401)
+    try:
+        payload = decode_jwt_token(req)
+
+        if not payload:
+            return Response({'error': 'Invalid or missing token'}, status=401)
+        
+        client_id = payload.get('client_id')
+        role= payload.get('role')
+
+        shops =(ShopLocation.objects.select_related('firm')
+                .only(
+                    'id', 'latitude', 'longitude', 'status', 
+                    'created_by', 'created_at', 'client_id',
+                    'firm__code', 'firm__name', 'firm__place'
+                ).order_by('-created_at'))
     
-    shops =ShopLocation.objects.filter(client_id=client_id)
-    
-    data=[]
-    for shop in shops:    
-        print("Client shops :",shop)
-        data.append({
-          'id':shop.id,
-          'shop_name': shop.firm.firm_name  if shop.firm else None,
-          'shop_address':shop.firm.address if shop.firm else None,
-          'latitude':float(shop.latitude) if shop.latitude else  None,
-          'longitude':float(shop.longitude) if shop.longitude else  None,
-          'status':shop.status,
-          'created_by': shop.created_by,
-          'created_at': shop.created_at,
-          'client_id': shop.client_id   
+
+        if not shops.exists():
+            return Response({
+                'success':True,
+                'data':[],
+                'message':'No Shop location Found'
+            })
+        
+        data=[]
+        for shop in shops:
+            try:
+                shop_data = {
+                    'id': shop.id,  # Use shop.id instead of shop.firm.code
+                    'firm_code': shop.firm.code if shop.firm else None,
+                    'shop_name': shop.firm.name if shop.firm else 'Unknown',
+                    'shop_address': shop.firm.place if shop.firm else 'No address',
+                    'latitude': float(shop.latitude) if shop.latitude is not None else None,
+                    'longitude': float(shop.longitude) if shop.longitude is not None else None,
+                    'status': shop.status,
+                    'created_by': shop.created_by,
+                    'created_at': shop.created_at.isoformat() if shop.created_at else None,
+                    'client_id': shop.client_id
+                }
+                data.append(shop_data)                    
+
+            except Exception as e :
+                print(f"Error processing shop {shop.id}: {str(e)}")
+                continue
+
+        return Response({
+            'success': True, 
+            'data': data,
+            'count': len(data)
         })
-
-    return Response({'success': True, 'Data':data})
-
+    
+    except Exception as e :
+        return Response(
+            {'error': 'Internal server error'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(['POST'])
