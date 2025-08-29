@@ -242,7 +242,6 @@ def update_location_status(req):
     
         updated_count = ShopLocation.objects.filter(
             client_id=client_id,
-            created_by=username,
             firm_id=shop_id
         ).update(status=newStatus)
 
