@@ -217,7 +217,7 @@ def get_table_data(req):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-
+# update_location_status
 @api_view(['POST'])
 def update_location_status(req):
 
