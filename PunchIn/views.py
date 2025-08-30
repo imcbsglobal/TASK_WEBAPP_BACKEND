@@ -158,66 +158,82 @@ def get_firms(request):
 
 # Get Table Datas
 @api_view(['GET'])
-def get_table_data(req):
-    try:
-        payload = decode_jwt_token(req)
-
-        if not payload:
-            return Response({'error': 'Invalid or missing token'}, status=401)
-        
-        client_id = payload.get('client_id')
-        role = payload.get('role')
-
-        shops = (ShopLocation.objects.filter(client_id=client_id)
-                 .select_related('firm')
-                 .only(
-                     'id', 'latitude', 'longitude', 'status', 
-                     'created_by', 'created_at', 'client_id',
-                     'firm__code', 'firm__name', 'firm__place'
-                 )
-                 .order_by('-created_at'))
+def get_table_data(request):
+    """Get shop location data for authenticated client"""
     
-
+    # Validate JWT token
+    payload = decode_jwt_token(request)
+    if not payload:
+        return Response({'error': 'Invalid or missing token'}, status=401)
+    
+    client_id = payload.get('client_id')
+    if not client_id:
+        return Response({'error': 'Invalid token payload'}, status=401)
+    
+    try:
+        # Optimized query - get all data in one go
+        shops = (ShopLocation.objects
+                .filter(client_id=client_id)
+                .select_related('firm')
+                .only(
+                    'id', 'latitude', 'longitude', 'status',
+                    'created_by', 'created_at', 'client_id',
+                    'firm__code', 'firm__name', 'firm__place'
+                )
+                .order_by('-created_at'))
+        
+        # Early return if no data
         if not shops.exists():
             return Response({
                 'success': True,
                 'data': [],
-                'message': 'No Shop location Found'
+                'message': 'No shop locations found',
+                'count': 0
             })
         
+        # Format data - cleaner and faster
         data = []
         for shop in shops:
-            try:
-                shop_data = {
-                    'id': shop.id, 
-                    'firm_code': shop.firm.code if shop.firm else None,
-                    'storeName': shop.firm.name if shop.firm else 'Unknown',
-                    'storeLocation': shop.firm.place if shop.firm else 'No address',
-                    'latitude': float(shop.latitude) if shop.latitude is not None else None,
-                    'longitude': float(shop.longitude) if shop.longitude is not None else None,
-                    'status': shop.status,
-                    'taskDoneBy': shop.created_by,
-                    'lastCapturedTime': shop.created_at.isoformat() if shop.created_at else None,
-                    'client_id': shop.client_id
-                }
-                data.append(shop_data)                    
-
-            except Exception as e:
-                print(f"Error processing shop {shop.id}: {str(e)}")
-                continue
-
+            # Safe field access
+            firm_code = getattr(shop.firm, 'code', None) if shop.firm else None
+            store_name = getattr(shop.firm, 'name', 'Unknown') if shop.firm else 'Unknown'
+            store_location = getattr(shop.firm, 'place', 'No address') if shop.firm else 'No address'
+            
+            # Safe coordinate conversion
+            latitude = float(shop.latitude) if shop.latitude is not None else None
+            longitude = float(shop.longitude) if shop.longitude is not None else None
+            
+            # Format timestamp
+            last_captured = shop.created_at.isoformat() if shop.created_at else None
+            
+            shop_data = {
+                'id': shop.id,
+                'firm_code': firm_code,
+                'storeName': store_name,
+                'storeLocation': store_location,
+                'latitude': latitude,
+                'longitude': longitude,
+                'status': shop.status,
+                'taskDoneBy': shop.created_by,
+                'lastCapturedTime': last_captured,
+                'client_id': shop.client_id
+            }
+            data.append(shop_data)
+        
         return Response({
-            'success': True, 
+            'success': True,
             'data': data,
-            'count': len(data)
+            'count': len(data),
+            'message': 'Shop locations retrieved successfully'
         })
-    
+        
     except Exception as e:
+        # Log the actual error for debugging
+        print(f"Error in get_table_data: {str(e)}")
         return Response(
             {'error': 'Internal server error'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            status=500
         )
-
 
 
 # update_location_status
