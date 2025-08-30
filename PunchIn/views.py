@@ -2,18 +2,38 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
+from django.db import transaction, DatabaseError
+from django.db.models import OuterRef, Subquery
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from decimal import Decimal, InvalidOperation
 import jwt
+import logging
+
 from .models import ShopLocation
 from .serializers import ShopLocationSerializer
-from app1.models import Misel,AccMaster  # import existing Misel
-from django.db.models import OuterRef, Subquery
-from django.db import DatabaseError
-from django.core.exceptions import ObjectDoesNotExist,MultipleObjectsReturned
-import logging
+from app1.models import Misel, AccMaster
 
 logger = logging.getLogger(__name__)
 
+
+def decode_jwt_token(request):
+    """Decode JWT token from Authorization header"""
+    auth_header = request.META.get("HTTP_AUTHORIZATION")
+    
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+    
+    token = auth_header.split(' ')[1]
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        return payload
+    except Exception:
+        return None
+
+
 def get_client_id_from_token(request):
+    """Get client_id from JWT token"""
     auth_header = request.META.get('HTTP_AUTHORIZATION')
     if not auth_header or not auth_header.startswith('Bearer '):
         return None
@@ -24,87 +44,82 @@ def get_client_id_from_token(request):
     except Exception:
         return None
 
-def decode_jwt_token(request):
 
-    auth_header = request.META.get("HTTP_AUTHORIZATION")
-    
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return None
-    
-    token =auth_header.split(' ')[1]
-
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-        return payload
-    
-    except Exception:
-        return None
-
-
-
-# add shop location
 @api_view(['POST'])
 def shop_location(request):
-
-    payload =decode_jwt_token(request)
-
-    client_id=payload.get("client_id")
-    username = payload.get("username")
-
-    if not client_id:
-        return Response({'error': 'Invalid or missing token'}, status=401)
-
-    firm_name = request.data.get('firm_name')
-    latitude = request.data.get('latitude')
-    longitude = request.data.get('longitude')
-
-    if not firm_name or not latitude or not longitude:
-        return Response({'error': 'firm_name, latitude, longitude required'}, status=400)
-
+    """Create or update shop location"""
     try:
-        firm = AccMaster.objects.get(name=firm_name, client_id=client_id)
-    except AccMaster.DoesNotExist:
-        return Response({'error': 'Invalid firm for this client'}, status=404)
+        payload = decode_jwt_token(request)
+        if not payload:
+            return Response({'error': 'Invalid or missing token'}, status=401)
 
-    
+        client_id = payload.get("client_id")
+        username = payload.get("username")
 
-    shop, created = ShopLocation.objects.get_or_create(
-        firm=firm,
-        client_id=client_id,
-        defaults={
-            'latitude': latitude,
-            'longitude': longitude,
-            "created_by" :username 
-        },
-    )
+        if not client_id:
+            return Response({'error': 'Invalid or missing token'}, status=401)
 
-    if not created:
-        shop.latitude = latitude
-        shop.longitude = longitude
+        firm_name = request.data.get('firm_name')
+        latitude = request.data.get('latitude')
+        longitude = request.data.get('longitude')
 
-        if username:  # optionally update who modified it
-            shop.created_by = username
+        if not firm_name or not latitude or not longitude:
+            return Response({'error': 'firm_name, latitude, longitude required'}, status=400)
 
-        shop.save()
+        # Validate coordinates
+        try:
+            lat = Decimal(str(latitude))
+            lng = Decimal(str(longitude))
+            if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+                return Response({'error': 'Invalid coordinate values'}, status=400)
+        except (InvalidOperation, ValueError):
+            return Response({'error': 'Invalid coordinate format'}, status=400)
 
-    serializer = ShopLocationSerializer(shop)
-    return Response({'success': True, 'data': serializer.data}, status=201 if created else 200)
+        try:
+            firm = AccMaster.objects.get(name=firm_name, client_id=client_id)
+        except AccMaster.DoesNotExist:
+            return Response({'error': 'Invalid firm for this client'}, status=404)
 
+        with transaction.atomic():
+            shop, created = ShopLocation.objects.get_or_create(
+                firm=firm,
+                client_id=client_id,
+                defaults={
+                    'latitude': latitude,
+                    'longitude': longitude,
+                    "created_by": username 
+                },
+            )
 
-# Punchin Drop down data  
+            if not created:
+                shop.latitude = latitude
+                shop.longitude = longitude
+                if username:
+                    shop.created_by = username
+                shop.save()
+
+        serializer = ShopLocationSerializer(shop)
+        return Response({'success': True, 'data': serializer.data}, status=201 if created else 200)
+
+    except DatabaseError as e:
+        logger.error(f"Database error in shop_location: {str(e)}")
+        return Response({'error': 'Database operation failed'}, status=500)
+    except Exception as e:
+        logger.exception("Unexpected error in shop_location")
+        return Response({'error': 'An unexpected error occurred'}, status=500)
+
 
 @api_view(['GET'])
 def get_firms(request):
+    """Get all firms with their latest shop location coordinates"""
     try:
-        # Decode token
         payload = decode_jwt_token(request)
-        client_id = payload.get('client_id')
+        if not payload:
+            return Response({'error': 'Invalid or missing token'}, status=401)
 
+        client_id = payload.get('client_id')
         if not client_id:
-            return Response(
-                {'error': 'Invalid or missing token'},
-                status=401
-            )
+            return Response({'error': 'Invalid or missing token'}, status=401)
 
         # Prepare subquery for latest shop location
         latest_shop = ShopLocation.objects.filter(
@@ -118,12 +133,8 @@ def get_firms(request):
             longitude=Subquery(latest_shop.values('longitude')[:1]),
         )
 
-        # If no firms found
         if not firms.exists():
-            return Response(
-                {'success': True, 'firms': [], 'message': 'No firms found'},
-                status=200
-            )
+            return Response({'success': True, 'firms': [], 'message': 'No firms found'}, status=200)
 
         # Build response data
         data = [
@@ -138,40 +149,27 @@ def get_firms(request):
 
         return Response({'success': True, 'firms': data}, status=200)
 
-    except ObjectDoesNotExist:
-        return Response(
-            {'error': 'Requested resource does not exist'},
-            status=404
-        )
-    except DatabaseError as db_err:
-        return Response(
-            {'error': 'Database error', 'details': str(db_err)},
-            status=500
-        )
+    except DatabaseError as e:
+        logger.error(f"Database error in get_firms: {str(e)}")
+        return Response({'error': 'Database error'}, status=500)
     except Exception as e:
-        # Catch-all for unexpected errors
-        return Response(
-            {'error': 'An unexpected error occurred', 'details': str(e)},
-            status=500
-        )
+        logger.exception("Unexpected error in get_firms")
+        return Response({'error': 'An unexpected error occurred'}, status=500)
 
 
-# Get Table Datas
 @api_view(['GET'])
 def get_table_data(request):
     """Get shop location data for authenticated client"""
-    
-    # Validate JWT token
-    payload = decode_jwt_token(request)
-    if not payload:
-        return Response({'error': 'Invalid or missing token'}, status=401)
-    
-    client_id = payload.get('client_id')
-    if not client_id:
-        return Response({'error': 'Invalid token payload'}, status=401)
-    
     try:
-        # Optimized query - get all data in one go
+        payload = decode_jwt_token(request)
+        if not payload:
+            return Response({'error': 'Invalid or missing token'}, status=401)
+        
+        client_id = payload.get('client_id')
+        if not client_id:
+            return Response({'error': 'Invalid token payload'}, status=401)
+        
+        # Optimized query
         shops = (ShopLocation.objects
                 .filter(client_id=client_id)
                 .select_related('firm')
@@ -182,28 +180,24 @@ def get_table_data(request):
                 )
                 .order_by('-created_at'))
         
-        # Early return if no data
         if not shops.exists():
             return Response({
                 'success': True,
                 'data': [],
                 'message': 'No shop locations found',
                 'count': 0
-            })
+            }, status=200)
         
-        # Format data - cleaner and faster
+        # Format data
         data = []
         for shop in shops:
-            # Safe field access
             firm_code = getattr(shop.firm, 'code', None) if shop.firm else None
             store_name = getattr(shop.firm, 'name', 'Unknown') if shop.firm else 'Unknown'
             store_location = getattr(shop.firm, 'place', 'No address') if shop.firm else 'No address'
             
-            # Safe coordinate conversion
             latitude = float(shop.latitude) if shop.latitude is not None else None
             longitude = float(shop.longitude) if shop.longitude is not None else None
             
-            # Format timestamp
             last_captured = shop.created_at.isoformat() if shop.created_at else None
             
             shop_data = {
@@ -225,56 +219,62 @@ def get_table_data(request):
             'data': data,
             'count': len(data),
             'message': 'Shop locations retrieved successfully'
-        })
+        }, status=200)
         
+    except DatabaseError as e:
+        logger.error(f"Database error in get_table_data: {str(e)}")
+        return Response({'error': 'Database error'}, status=500)
     except Exception as e:
-        # Log the actual error for debugging
-        print(f"Error in get_table_data: {str(e)}")
-        return Response(
-            {'error': 'Internal server error'}, 
-            status=500
-        )
+        logger.exception("Unexpected error in get_table_data")
+        return Response({'error': 'Internal server error'}, status=500)
 
 
-# update_location_status
 @api_view(['POST'])
-def update_location_status(req):
-
+def update_location_status(request):
+    """Update the status of a shop location"""
     try:
-        payload =decode_jwt_token(req)
-
+        payload = decode_jwt_token(request)
         if not payload:
             return Response({'error': 'Invalid or missing token'}, status=401)
         
-
-        client_id=payload.get("client_id")
+        client_id = payload.get("client_id")
         username = payload.get("username")
 
-        newStatus = req.data.get('status')
-        shop_id = req.data.get('shop_id')
+        new_status = request.data.get('status')
+        shop_id = request.data.get('shop_id')
 
-        if not newStatus:
-            return Response({"error":'Status is required'},status=400)
+        if not new_status:
+            return Response({"error": 'Status is required'}, status=400)
 
-        if not shop_id :
-            return Response({"error":'ShopId is required'},status=400)
+        if not shop_id:
+            return Response({"error": 'ShopId is required'}, status=400)
     
-        updated_count = ShopLocation.objects.filter(
-            client_id=client_id,
-            firm_id=shop_id
-        ).update(status=newStatus)
+        with transaction.atomic():
+            updated_count = ShopLocation.objects.filter(
+                client_id=client_id,
+                firm_id=shop_id
+            ).update(status=new_status)
 
-        if updated_count ==0:
-            return Response({'error': 'Shop not found or unauthorized'}, status=404)
+            if updated_count == 0:
+                return Response({'error': 'Shop not found or unauthorized'}, status=404)
 
-        return Response({'success': True, 'updated_count': updated_count})
-
+        return Response({'success': True, 'updated_count': updated_count}, status=200)
 
     except MultipleObjectsReturned:
-        logger.error(f"Multiple ShopLocations found for client_id={client_id}, username={username}, shop_id={shop_id}")
+        logger.error(f"Multiple ShopLocations found for client_id={client_id}, shop_id={shop_id}")
         return Response({'error': 'Multiple shops found with same ID, please contact support'}, status=500)
-
+    except DatabaseError as e:
+        logger.error(f"Database error in update_location_status: {str(e)}")
+        return Response({'error': 'Database error'}, status=500)
     except Exception as e:
         logger.exception("Unexpected error while updating shop status")
         return Response({'error': 'Internal server error'}, status=500)
 
+
+@api_view(['GET'])
+def health_check(request):
+    """Simple health check endpoint"""
+    return Response({
+        'status': 'healthy',
+        'message': 'API is running'
+    }, status=200)
