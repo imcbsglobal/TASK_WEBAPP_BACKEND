@@ -159,7 +159,6 @@ def get_firms(request):
 # Get Table Datas
 @api_view(['GET'])
 def get_table_data(req):
-
     try:
         payload = decode_jwt_token(req)
 
@@ -167,24 +166,26 @@ def get_table_data(req):
             return Response({'error': 'Invalid or missing token'}, status=401)
         
         client_id = payload.get('client_id')
-        role= payload.get('role')
+        role = payload.get('role')
 
-        shops =(ShopLocation.objects.select_related('firm')
-                .only(
-                    'id', 'latitude', 'longitude', 'status', 
-                    'created_by', 'created_at', 'client_id',
-                    'firm__code', 'firm__name', 'firm__place'
-                ).order_by('-created_at'))
+        shops = (ShopLocation.objects.filter(client_id=client_id)
+                 .select_related('firm')
+                 .only(
+                     'id', 'latitude', 'longitude', 'status', 
+                     'created_by', 'created_at', 'client_id',
+                     'firm__code', 'firm__name', 'firm__place'
+                 )
+                 .order_by('-created_at'))
     
 
         if not shops.exists():
             return Response({
-                'success':True,
-                'data':[],
-                'message':'No Shop location Found'
+                'success': True,
+                'data': [],
+                'message': 'No Shop location Found'
             })
         
-        data=[]
+        data = []
         for shop in shops:
             try:
                 shop_data = {
@@ -201,7 +202,7 @@ def get_table_data(req):
                 }
                 data.append(shop_data)                    
 
-            except Exception as e :
+            except Exception as e:
                 print(f"Error processing shop {shop.id}: {str(e)}")
                 continue
 
@@ -211,11 +212,13 @@ def get_table_data(req):
             'count': len(data)
         })
     
-    except Exception as e :
+    except Exception as e:
         return Response(
             {'error': 'Internal server error'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
 
 # update_location_status
 @api_view(['POST'])
