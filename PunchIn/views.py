@@ -159,95 +159,99 @@ def get_firms(request):
 
 @api_view(['GET'])
 def get_table_data(request):
-    """Get shop location data for authenticated client"""
+    """Get shop location data for authenticated client using optimized raw SQL"""
     try:
         payload = decode_jwt_token(request)
         if not payload:
             return Response({'error': 'Invalid or missing token'}, status=401)
-        
+
         client_id = payload.get('client_id')
         if not client_id:
             return Response({'error': 'Invalid token payload'}, status=401)
-        
-        # Simple query without .only() to avoid attribute errors
-        shops = (ShopLocation.objects
-                .filter(client_id=client_id)
-                .select_related('firm')
-                .order_by('-created_at'))
-        
-        if not shops.exists():
+
+        from django.db import connection
+
+        # ✅ Dynamic table names (no hardcoding)
+        shop_table = ShopLocation._meta.db_table       # "shop_location"
+        firm_table = AccMaster._meta.db_table          # "acc_master"
+
+        # ✅ Correct join: shop_location.firm_code → acc_master.code
+        sql_query = f"""
+        SELECT 
+            s.id,
+            s.latitude,
+            s.longitude,
+            s.status,
+            s.created_by,
+            s.created_at,
+            s.client_id,
+            a.code as firm_code,
+            COALESCE(a.name, 'Unknown Store') as firm_name,
+            COALESCE(a.place, 'No address') as firm_place
+        FROM {shop_table} s
+        LEFT JOIN {firm_table} a ON s.firm_code = a.code AND s.client_id = a.client_id
+        WHERE s.client_id = %s
+        ORDER BY s.created_at DESC
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query, [client_id])
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+
+        if not rows:
             return Response({
                 'success': True,
                 'data': [],
                 'message': 'No shop locations found',
                 'count': 0
             }, status=200)
-        
-        # Format data with safe attribute access
+
+        # ✅ Convert rows → dicts
         data = []
-        for shop in shops:
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+
+            # Safe coordinate conversion
             try:
-                # Safe firm data extraction with multiple fallbacks
-                if shop.firm:
-                    firm_code = getattr(shop.firm, 'code', None) or getattr(shop.firm, 'id', None)
-                    store_name = (getattr(shop.firm, 'name', None) or 
-                                getattr(shop.firm, 'firm_name', None) or 
-                                'Unknown Store')
-                    store_location = (getattr(shop.firm, 'place', None) or 
-                                    getattr(shop.firm, 'address', None) or 
-                                    getattr(shop.firm, 'location', None) or 
-                                    'No address')
-                else:
-                    firm_code = None
-                    store_name = 'Unknown Store'
-                    store_location = 'No address'
-                
-                # Safe coordinate conversion
-                try:
-                    latitude = float(shop.latitude) if shop.latitude is not None else None
-                    longitude = float(shop.longitude) if shop.longitude is not None else None
-                except (ValueError, TypeError):
-                    latitude = None
-                    longitude = None
-                
-                # Safe timestamp formatting
-                try:
-                    last_captured = shop.created_at.isoformat() if shop.created_at else None
-                except (AttributeError, ValueError):
-                    last_captured = None
-                
-                shop_data = {
-                    'id': shop.id,
-                    'firm_code': firm_code,
-                    'storeName': store_name,
-                    'storeLocation': store_location,
-                    'latitude': latitude,
-                    'longitude': longitude,
-                    'status': shop.status or 'active',
-                    'taskDoneBy': shop.created_by or 'Unknown',
-                    'lastCapturedTime': last_captured,
-                    'client_id': shop.client_id
-                }
-                data.append(shop_data)
-                
-            except Exception as shop_error:
-                # Log individual shop processing error but continue
-                logger.warning(f"Error processing shop {shop.id}: {str(shop_error)}")
-                continue
-        
+                latitude = float(row_dict['latitude']) if row_dict['latitude'] is not None else None
+                longitude = float(row_dict['longitude']) if row_dict['longitude'] is not None else None
+            except (ValueError, TypeError):
+                latitude, longitude = None, None
+
+            # Safe timestamp formatting
+            try:
+                last_captured = row_dict['created_at'].isoformat() if row_dict['created_at'] else None
+            except Exception:
+                last_captured = str(row_dict['created_at']) if row_dict['created_at'] else None
+
+            data.append({
+                'id': row_dict['id'],
+                'firm_code': row_dict['firm_code'],
+                'storeName': row_dict['firm_name'],
+                'storeLocation': row_dict['firm_place'],
+                'latitude': latitude,
+                'longitude': longitude,
+                'status': row_dict['status'] or 'pending',
+                'taskDoneBy': row_dict['created_by'] or 'Unknown',
+                'lastCapturedTime': last_captured,
+                'client_id': row_dict['client_id'],
+            })
+
         return Response({
             'success': True,
             'data': data,
             'count': len(data),
             'message': 'Shop locations retrieved successfully'
         }, status=200)
-        
+
     except DatabaseError as e:
         logger.error(f"Database error in get_table_data: {str(e)}")
         return Response({'error': 'Database error'}, status=500)
     except Exception as e:
         logger.exception("Unexpected error in get_table_data")
         return Response({'error': 'Internal server error'}, status=500)
+
 
 
 
