@@ -169,15 +169,10 @@ def get_table_data(request):
         if not client_id:
             return Response({'error': 'Invalid token payload'}, status=401)
         
-        # Optimized query
+        # Simple query without .only() to avoid attribute errors
         shops = (ShopLocation.objects
                 .filter(client_id=client_id)
                 .select_related('firm')
-                .only(
-                    'id', 'latitude', 'longitude', 'status',
-                    'created_by', 'created_at', 'client_id',
-                    'firm__code', 'firm__name', 'firm__place'
-                )
                 .order_by('-created_at'))
         
         if not shops.exists():
@@ -188,31 +183,57 @@ def get_table_data(request):
                 'count': 0
             }, status=200)
         
-        # Format data
+        # Format data with safe attribute access
         data = []
         for shop in shops:
-            firm_code = getattr(shop.firm, 'code', None) if shop.firm else None
-            store_name = getattr(shop.firm, 'name', 'Unknown') if shop.firm else 'Unknown'
-            store_location = getattr(shop.firm, 'place', 'No address') if shop.firm else 'No address'
-            
-            latitude = float(shop.latitude) if shop.latitude is not None else None
-            longitude = float(shop.longitude) if shop.longitude is not None else None
-            
-            last_captured = shop.created_at.isoformat() if shop.created_at else None
-            
-            shop_data = {
-                'id': shop.id,
-                'firm_code': firm_code,
-                'storeName': store_name,
-                'storeLocation': store_location,
-                'latitude': latitude,
-                'longitude': longitude,
-                'status': shop.status,
-                'taskDoneBy': shop.created_by,
-                'lastCapturedTime': last_captured,
-                'client_id': shop.client_id
-            }
-            data.append(shop_data)
+            try:
+                # Safe firm data extraction with multiple fallbacks
+                if shop.firm:
+                    firm_code = getattr(shop.firm, 'code', None) or getattr(shop.firm, 'id', None)
+                    store_name = (getattr(shop.firm, 'name', None) or 
+                                getattr(shop.firm, 'firm_name', None) or 
+                                'Unknown Store')
+                    store_location = (getattr(shop.firm, 'place', None) or 
+                                    getattr(shop.firm, 'address', None) or 
+                                    getattr(shop.firm, 'location', None) or 
+                                    'No address')
+                else:
+                    firm_code = None
+                    store_name = 'Unknown Store'
+                    store_location = 'No address'
+                
+                # Safe coordinate conversion
+                try:
+                    latitude = float(shop.latitude) if shop.latitude is not None else None
+                    longitude = float(shop.longitude) if shop.longitude is not None else None
+                except (ValueError, TypeError):
+                    latitude = None
+                    longitude = None
+                
+                # Safe timestamp formatting
+                try:
+                    last_captured = shop.created_at.isoformat() if shop.created_at else None
+                except (AttributeError, ValueError):
+                    last_captured = None
+                
+                shop_data = {
+                    'id': shop.id,
+                    'firm_code': firm_code,
+                    'storeName': store_name,
+                    'storeLocation': store_location,
+                    'latitude': latitude,
+                    'longitude': longitude,
+                    'status': shop.status or 'active',
+                    'taskDoneBy': shop.created_by or 'Unknown',
+                    'lastCapturedTime': last_captured,
+                    'client_id': shop.client_id
+                }
+                data.append(shop_data)
+                
+            except Exception as shop_error:
+                # Log individual shop processing error but continue
+                logger.warning(f"Error processing shop {shop.id}: {str(shop_error)}")
+                continue
         
         return Response({
             'success': True,
@@ -227,6 +248,7 @@ def get_table_data(request):
     except Exception as e:
         logger.exception("Unexpected error in get_table_data")
         return Response({'error': 'Internal server error'}, status=500)
+
 
 
 @api_view(['POST'])
