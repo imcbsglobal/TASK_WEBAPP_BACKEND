@@ -168,16 +168,21 @@ def get_table_data(request):
         client_id = payload.get('client_id')
         if not client_id:
             return Response({'error': 'Invalid token payload'}, status=401)
-
+        userRole=payload.get('role')
+        userName=payload.get('username')
+        print(userRole)
         from django.db import connection
 
         # ✅ Dynamic table names (no hardcoding)
         shop_table = ShopLocation._meta.db_table       # "shop_location"
         firm_table = AccMaster._meta.db_table          # "acc_master"
 
+        if(userRole=='Admin' or userRole =='admin'):
+            
+
         # ✅ Correct join: shop_location.firm_code → acc_master.code
-        sql_query = f"""
-        SELECT 
+            sql_query = f"""
+            SELECT 
             s.id,
             s.latitude,
             s.longitude,
@@ -188,11 +193,30 @@ def get_table_data(request):
             a.code as firm_code,
             COALESCE(a.name, 'Unknown Store') as firm_name,
             COALESCE(a.place, 'No address') as firm_place
-        FROM {shop_table} s
-        LEFT JOIN {firm_table} a ON s.firm_code = a.code AND s.client_id = a.client_id
-        WHERE s.client_id = %s
-        ORDER BY s.created_at DESC
-        """
+            FROM {shop_table} s
+            LEFT JOIN {firm_table} a ON s.firm_code = a.code AND s.client_id = a.client_id
+            WHERE s.client_id = %s
+            ORDER BY s.created_at DESC
+            """
+        else :
+                        sql_query = f"""
+            SELECT 
+            s.id,
+            s.latitude,
+            s.longitude,
+            s.status,
+            s.created_by,
+            s.created_at,
+            s.client_id,
+            a.code as firm_code,
+            COALESCE(a.name, 'Unknown Store') as firm_name,
+            COALESCE(a.place, 'No address') as firm_place
+            FROM {shop_table} s
+            LEFT JOIN {firm_table} a ON s.firm_code = a.code AND s.client_id = a.client_id
+            WHERE s.client_id = %s AND s.created_by = '{userName}'
+            ORDER BY s.created_at DESC
+            """
+
 
         with connection.cursor() as cursor:
             cursor.execute(sql_query, [client_id])
