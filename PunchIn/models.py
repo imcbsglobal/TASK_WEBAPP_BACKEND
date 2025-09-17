@@ -32,3 +32,44 @@ class ShopLocation(models.Model):
             models.Index(fields=["firm", "client_id"], name="idx_firm_client"),
             models.Index(fields=["created_at"], name="idx_created_at"),
         ]
+
+class PunchIn(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("completed", "Completed"),
+    ]
+
+    firm = models.ForeignKey(
+        AccMaster,
+        to_field="code",
+        db_column="firm_code",
+        on_delete=models.CASCADE,
+        db_constraint=False,
+        related_name="punchins",  # unique related_name
+    )
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    client_id = models.CharField(max_length=64, db_index=True)
+
+    # Track punchin and punchout
+    punchin_time = models.DateTimeField(auto_now_add=True)   # when record is created
+    punchout_time = models.DateTimeField(null=True, blank=True)  # filled later
+
+    # Optional photo proof
+    # photo_file = models.ImageField(upload_to="punchin_photos/", null=True, blank=True)
+    photo_url = models.URLField(max_length=255, null=True, blank=True)
+
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="pending"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)  # useful for audits
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "punchin"
+        indexes = [
+            models.Index(fields=["firm", "client_id"], name="idx_firm_client"),
+            models.Index(fields=["punchin_time"], name="idx_punchin_time"),
+        ]
+        ordering = ["-punchin_time"]  # newest first
