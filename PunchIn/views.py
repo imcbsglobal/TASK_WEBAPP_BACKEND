@@ -342,6 +342,7 @@ def get_upload_signature(request):
             return Response({'error': 'Invalid token payload'}, status=401)
         
         timestamp = int(time.time())
+        logger.info(f"Generating signature for user: {username}, timestamp: {timestamp}")
         
         # ✅ Access Cloudinary config
         cloudinary_config = settings.CLOUDINARY_STORAGE
@@ -349,44 +350,66 @@ def get_upload_signature(request):
         cloud_name = cloudinary_config['CLOUD_NAME']
         api_key = cloudinary_config['API_KEY']
         
-        # ✅ Add upload restrictions
-        upload_params = {
+        # ✅ ONLY include parameters that will be signed
+        # Parameters that go into the signature generation
+        params_to_sign = {
             'timestamp': timestamp,
-            'folder': f'punch_images/{client_id}/{username}',  # Organize by client
-            'allowed_formats': 'jpg,png,jpeg',      # Only images
-            'max_file_size': 5000000,               # 5MB limit
-            'resource_type': 'image',               # Images only
-            'tags': f'client_{client_id},user_{username}'  # Add metadata
+            'folder': f'punch_images/{client_id}/{username}',
+            'allowed_formats': 'jpg,png,jpeg',
+            'tags': f'client_{client_id},user_{username}'
         }
         
-        # ✅ Create signature string with all params
-        params_list = []
-        for key in sorted(upload_params.keys()):
-            if key != 'resource_type':  # Cloudinary doesn't sign this
-                params_list.append(f"{key}={upload_params[key]}")
+        # Additional params for frontend validation (NOT signed)
+        additional_params = {
+            'max_file_size': 5000000,  # 5MB limit - frontend validation only
+            'resource_type': 'image'   # Not included in signature
+        }
         
-        params_to_sign = "&".join(params_list)
-        signature_string = params_to_sign + api_secret
+        # ✅ Create signature string - ONLY signed parameters
+        params_list = []
+        for key in sorted(params_to_sign.keys()):
+            params_list.append(f"{key}={params_to_sign[key]}")
+        
+        params_string = "&".join(params_list)
+        signature_string = params_string + api_secret
         signature = hashlib.sha1(signature_string.encode('utf-8')).hexdigest()
         
-        # ✅ Don't expose API key - use environment variables on frontend
-        return JsonResponse({
-            "timestamp": timestamp,
-            "signature": signature,
-            "cloudName": cloud_name,
-            "folder": upload_params['folder'],
-            "allowed_formats": upload_params['allowed_formats'],
-            "max_file_size": upload_params['max_file_size'],
-            "tags": upload_params['tags']
-            # Note: API key should be set in frontend environment variables
-        })
+        # ✅ Log for debugging
+        logger.info(f"Params to sign: {params_string}")
+        logger.info(f"Generated signature: {signature}")
+        
+        response_data = {
+            'success': True,
+            'data': {
+                "timestamp": timestamp,
+                "signature": signature,
+                "cloudName": cloud_name,
+                # Signed parameters
+                "folder": params_to_sign['folder'],
+                "allowed_formats": params_to_sign['allowed_formats'],
+                "tags": params_to_sign['tags'],
+                # Additional parameters for frontend (not signed)
+                "max_file_size": additional_params['max_file_size'],
+                "success": True
+            }
+        }
+        
+        logger.info(f"Successfully generated signature for user: {username}")
+        
+        return Response(response_data, status=200)
         
     except KeyError as e:
         logger.error(f"Missing Cloudinary configuration: {str(e)}")
-        return Response({'error': 'Service configuration error'}, status=500)
+        return Response({'error': 'Service configuration error', 'success': False}, status=500)
     except Exception as e:
-        logger.error(f"Error generating upload signature for user {username}: {str(e)}")
-        return Response({'error': 'Failed to generate upload signature'}, status=500)
+        logger.error(f"Error generating upload signature for user {username if 'username' in locals() else 'unknown'}: {str(e)}")
+        return Response({'error': 'Failed to generate upload signature', 'success': False}, status=500)
+
+@api_view(['POST'])
+def punchin(request):
+    print("j")
+
+
 
 
 

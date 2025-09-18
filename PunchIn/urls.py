@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import shop_location, get_firms,get_table_data,update_location_status ,get_upload_signature
+from .views import shop_location, get_firms,get_table_data,update_location_status ,get_upload_signature,punchin
 
 urlpatterns = [    
     #Shop Location Management
@@ -9,7 +9,7 @@ urlpatterns = [
     path('shop-location/status/',update_location_status , name='update_location_status'),
 
     #Punch In System
-    path("punch-in/cloudinary-signature/",get_upload_signature, name="cloudinary-signature")
-
+    path("punch-in/cloudinary-signature/",get_upload_signature, name="cloudinary-signature"),
+    path("punch-in/",punchin, name="punchin")
 
 ]
