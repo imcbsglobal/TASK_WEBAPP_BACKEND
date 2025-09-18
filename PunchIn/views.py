@@ -6,8 +6,11 @@ from django.db import transaction, DatabaseError
 from django.db.models import OuterRef, Subquery
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from decimal import Decimal, InvalidOperation
+from django.http import JsonResponse
 import jwt
 import logging
+import time
+import hashlib
 
 from .models import ShopLocation
 from .serializers import ShopLocationSerializer
@@ -319,6 +322,73 @@ def update_location_status(request):
     except Exception as e:
         logger.exception("Unexpected error while updating shop status")
         return Response({'error': 'Internal server error'}, status=500)
+
+
+@api_view(['GET'])
+def get_upload_signature(request):
+    """
+    Generate Cloudinary upload signature for authenticated users with restrictions
+    """
+    try:
+        # ✅ Authenticate user first
+        payload = decode_jwt_token(request)
+        if not payload:
+            return Response({'error': 'Authentication required'}, status=401)
+        
+        client_id = payload.get('client_id')
+        username = payload.get('username')
+        
+        if not client_id or not username:
+            return Response({'error': 'Invalid token payload'}, status=401)
+        
+        timestamp = int(time.time())
+        
+        # ✅ Access Cloudinary config
+        cloudinary_config = settings.CLOUDINARY_STORAGE
+        api_secret = cloudinary_config['API_SECRET']
+        cloud_name = cloudinary_config['CLOUD_NAME']
+        api_key = cloudinary_config['API_KEY']
+        
+        # ✅ Add upload restrictions
+        upload_params = {
+            'timestamp': timestamp,
+            'folder': f'punch_images/{client_id}/{username}',  # Organize by client
+            'allowed_formats': 'jpg,png,jpeg',      # Only images
+            'max_file_size': 5000000,               # 5MB limit
+            'resource_type': 'image',               # Images only
+            'tags': f'client_{client_id},user_{username}'  # Add metadata
+        }
+        
+        # ✅ Create signature string with all params
+        params_list = []
+        for key in sorted(upload_params.keys()):
+            if key != 'resource_type':  # Cloudinary doesn't sign this
+                params_list.append(f"{key}={upload_params[key]}")
+        
+        params_to_sign = "&".join(params_list)
+        signature_string = params_to_sign + api_secret
+        signature = hashlib.sha1(signature_string.encode('utf-8')).hexdigest()
+        
+        # ✅ Don't expose API key - use environment variables on frontend
+        return JsonResponse({
+            "timestamp": timestamp,
+            "signature": signature,
+            "cloudName": cloud_name,
+            "folder": upload_params['folder'],
+            "allowed_formats": upload_params['allowed_formats'],
+            "max_file_size": upload_params['max_file_size'],
+            "tags": upload_params['tags']
+            # Note: API key should be set in frontend environment variables
+        })
+        
+    except KeyError as e:
+        logger.error(f"Missing Cloudinary configuration: {str(e)}")
+        return Response({'error': 'Service configuration error'}, status=500)
+    except Exception as e:
+        logger.error(f"Error generating upload signature for user {username}: {str(e)}")
+        return Response({'error': 'Failed to generate upload signature'}, status=500)
+
+
 
 
 @api_view(['GET'])

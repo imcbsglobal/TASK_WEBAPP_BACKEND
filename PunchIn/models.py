@@ -29,9 +29,14 @@ class ShopLocation(models.Model):
     class Meta:
         db_table = "shop_location"
         indexes = [
-            models.Index(fields=["firm", "client_id"], name="idx_firm_client"),
-            models.Index(fields=["created_at"], name="idx_created_at"),
+            models.Index(fields=["firm", "client_id"], name="idx_shop_firm_client"),
+            models.Index(fields=["created_at"], name="idx_shop_created_at"),
         ]
+
+
+
+
+
 
 class PunchIn(models.Model):
     STATUS_CHOICES = [
@@ -69,7 +74,7 @@ class PunchIn(models.Model):
     class Meta:
         db_table = "punchin"
         indexes = [
-            models.Index(fields=["firm", "client_id"], name="idx_firm_client"),
+            models.Index(fields=["firm", "client_id"], name="idx_punchin_firm_client"),
             models.Index(fields=["punchin_time"], name="idx_punchin_time"),
         ]
         ordering = ["-punchin_time"]  # newest first
