@@ -60,9 +60,13 @@ class PunchIn(models.Model):
     punchin_time = models.DateTimeField(auto_now_add=True)   # when record is created
     punchout_time = models.DateTimeField(null=True, blank=True)  # filled later
 
-    # Optional photo proof
-    # photo_file = models.ImageField(upload_to="punchin_photos/", null=True, blank=True)
-    photo_url = models.URLField(max_length=255, null=True, blank=True)
+    # User information
+    created_by = models.CharField(max_length=64)  # username from JWT
+
+    # Location and photo
+    photo_url = models.URLField(max_length=500, null=True, blank=True)
+    address = models.TextField(blank=True, null=True)  # Optional address
+    notes = models.TextField(blank=True, null=True)  # Optional notes
 
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default="pending"
@@ -76,5 +80,9 @@ class PunchIn(models.Model):
         indexes = [
             models.Index(fields=["firm", "client_id"], name="idx_punchin_firm_client"),
             models.Index(fields=["punchin_time"], name="idx_punchin_time"),
+            models.Index(fields=["client_id", "created_by"], name="idx_punchin_client_user"),
         ]
         ordering = ["-punchin_time"]  # newest first
+
+    def __str__(self):
+        return f"{self.created_by} - {self.firm.name} - {self.punchin_time.strftime('%Y-%m-%d %H:%M')}"

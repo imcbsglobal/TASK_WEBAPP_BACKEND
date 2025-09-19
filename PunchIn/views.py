@@ -12,7 +12,7 @@ import logging
 import time
 import hashlib
 
-from .models import ShopLocation
+from .models import ShopLocation, PunchIn
 from .serializers import ShopLocationSerializer
 from app1.models import Misel, AccMaster
 
@@ -159,7 +159,7 @@ def get_firms(request):
         logger.exception("Unexpected error in get_firms")
         return Response({'error': 'An unexpected error occurred'}, status=500)
 
-
+# shop location table 
 @api_view(['GET'])
 def get_table_data(request):
     """Get shop location data for authenticated client using optimized raw SQL"""
@@ -342,6 +342,9 @@ def get_upload_signature(request):
             return Response({'error': 'Invalid token payload'}, status=401)
         
         timestamp = int(time.time())
+        today_str  = time.strftime("%Y-%m-%d")
+
+
         logger.info(f"Generating signature for user: {username}, timestamp: {timestamp}")
         
         # ✅ Access Cloudinary config
@@ -349,14 +352,15 @@ def get_upload_signature(request):
         api_secret = cloudinary_config['API_SECRET']
         cloud_name = cloudinary_config['CLOUD_NAME']
         api_key = cloudinary_config['API_KEY']
-        
+        public_id = f"punch_images/{client_id}/{username}/{today_str}"
         # ✅ ONLY include parameters that will be signed
         # Parameters that go into the signature generation
         params_to_sign = {
             'timestamp': timestamp,
             'folder': f'punch_images/{client_id}/{username}',
             'allowed_formats': 'jpg,png,jpeg',
-            'tags': f'client_{client_id},user_{username}'
+            'tags': f'client_{client_id},user_{username}',
+            'public_id':public_id
         }
         
         # Additional params for frontend validation (NOT signed)
@@ -390,6 +394,7 @@ def get_upload_signature(request):
                 "tags": params_to_sign['tags'],
                 # Additional parameters for frontend (not signed)
                 "max_file_size": additional_params['max_file_size'],
+                'public_id': public_id,
                 "success": True
             }
         }
@@ -407,7 +412,275 @@ def get_upload_signature(request):
 
 @api_view(['POST'])
 def punchin(request):
-    print("j")
+    """
+    Handle punch-in functionality with image upload and location tracking
+    """
+    try:
+        # ✅ Authenticate user
+        payload = decode_jwt_token(request)
+        if not payload:
+            return Response({'error': 'Authentication required'}, status=401)
+        
+        client_id = payload.get('client_id')
+        username = payload.get('username')
+        user_id = payload.get('user_id')
+
+        if not client_id or not username:
+            return Response({'error': 'Invalid token payload'}, status=401)
+
+        # Get request data
+        firm_code = request.data.get('customerCode')
+        latitude = request.data.get('latitude')
+        longitude = request.data.get('longitude')
+        photo_url = request.data.get('photo_url')  # Cloudinary URL after upload
+        notes = request.data.get('notes', '')
+        address = request.data.get('address', '')
+
+        #  Validate required fields
+        if not firm_code:
+            return Response({'error': 'firm_code is required'}, status=400)
+        
+        if not latitude or not longitude:
+            return Response({'error': 'Location coordinates are required'}, status=400)
+
+        if not photo_url:
+            return Response({'error': 'Photo is required for punch-in'}, status=400)
+
+        #  Validate coordinates
+        try:
+            lat = float(latitude)
+            lng = float(longitude)
+            if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+                return Response({'error': 'Invalid coordinate values'}, status=400)
+        except (ValueError, TypeError):
+            return Response({'error': 'Invalid coordinate format'}, status=400)
+
+        #  Verify firm exists for this client
+        try:
+            firm = AccMaster.objects.get(code=firm_code, client_id=client_id)
+        except AccMaster.DoesNotExist:
+            return Response({'error': 'Invalid firm code for this client'}, status=404)
+
+        #  Check if user is already punched in today
+        from django.utils import timezone
+        today = timezone.now().date()
+        existing_punchin = PunchIn.objects.filter(
+            client_id=client_id,
+            created_by=username,
+            punchin_time__date=today,
+            punchout_time__isnull=True  # Still punched in
+        ).first()
+
+        # if existing_punchin:
+        #     return Response({
+        #         'error': 'You are already punched in today. Please punch out first.',
+        #         'existing_punchin_id': existing_punchin.id,
+        #         'punchin_time': existing_punchin.punchin_time.isoformat()
+        #     }, status=400)
+
+        #  Create punch-in record
+        with transaction.atomic():
+            punchin_record = PunchIn.objects.create(
+                firm=firm,
+                client_id=client_id,
+                latitude=lat,
+                longitude=lng,
+                photo_url=photo_url,
+                address=address,
+                notes=notes,
+                created_by=username,
+                status='pending'
+            )
+
+            logger.info(f"Punch-in created successfully for user {username}, ID: {punchin_record.id}")
+
+        # ✅ Prepare response data
+        response_data = {
+            'success': True,
+            'message': 'Punch-in recorded successfully',
+            'data': {
+                'punchin_id': punchin_record.id,
+                'firm_name': firm.name,
+                'firm_code': firm.code,
+                'punchin_time': punchin_record.punchin_time.isoformat(),
+                'latitude': float(punchin_record.latitude),
+                'longitude': float(punchin_record.longitude),
+                'photo_url': punchin_record.photo_url,
+                'address': punchin_record.address,
+                'status': punchin_record.status,
+                'created_by': punchin_record.created_by
+            }
+        }
+
+        return Response(response_data, status=201)
+
+    except DatabaseError as e:
+        logger.error(f"Database error in punchin: {str(e)}")
+        return Response({'error': 'Database operation failed'}, status=500)
+    except Exception as e:
+        logger.error(f"Error in punchin for user {username if 'username' in locals() else 'unknown'}: {str(e)}")
+        return Response({'error': 'Punch-in failed'}, status=500)
+
+
+@api_view(['POST'])
+def punchout(request):
+    """
+    Handle punch-out functionality
+    """
+    try:
+        # ✅ Authenticate user
+        payload = decode_jwt_token(request)
+        if not payload:
+            return Response({'error': 'Authentication required'}, status=401)
+        
+        client_id = payload.get('client_id')
+        username = payload.get('username')
+
+        if not client_id or not username:
+            return Response({'error': 'Invalid token payload'}, status=401)
+
+        # ✅ Get optional data
+        notes = request.data.get('notes', '')
+
+        # ✅ Find active punch-in record
+        from django.utils import timezone
+        today = timezone.now().date()
+        
+        active_punchin = PunchIn.objects.filter(
+            client_id=client_id,
+            created_by=username,
+            punchin_time__date=today,
+            punchout_time__isnull=True
+        ).first()
+
+        if not active_punchin:
+            return Response({
+                'error': 'No active punch-in found for today'
+            }, status=400)
+
+        # ✅ Update punch-out time
+        with transaction.atomic():
+            active_punchin.punchout_time = timezone.now()
+            active_punchin.status = 'completed'
+            if notes:
+                active_punchin.notes = (active_punchin.notes + f"\nPunch-out notes: {notes}").strip()
+            active_punchin.save()
+
+            logger.info(f"Punch-out recorded successfully for user {username}, ID: {active_punchin.id}")
+
+        # ✅ Calculate work duration
+        work_duration = active_punchin.punchout_time - active_punchin.punchin_time
+        hours = work_duration.total_seconds() / 3600
+
+        response_data = {
+            'success': True,
+            'message': 'Punch-out recorded successfully',
+            'data': {
+                'punchin_id': active_punchin.id,
+                'firm_name': active_punchin.firm.name,
+                'punchin_time': active_punchin.punchin_time.isoformat(),
+                'punchout_time': active_punchin.punchout_time.isoformat(),
+                'work_duration_hours': round(hours, 2),
+                'status': active_punchin.status
+            }
+        }
+
+        return Response(response_data, status=200)
+
+    except DatabaseError as e:
+        logger.error(f"Database error in punchout: {str(e)}")
+        return Response({'error': 'Database operation failed'}, status=500)
+    except Exception as e:
+        logger.error(f"Error in punchout for user {username if 'username' in locals() else 'unknown'}: {str(e)}")
+        return Response({'error': 'Punch-out failed'}, status=500)
+
+
+@api_view(['GET'])
+def get_punch_status(request):
+    """
+    Get current punch status for authenticated user
+    """
+    try:
+        # ✅ Authenticate user
+        payload = decode_jwt_token(request)
+        if not payload:
+            return Response({'error': 'Authentication required'}, status=401)
+        
+        client_id = payload.get('client_id')
+        username = payload.get('username')
+
+        if not client_id or not username:
+            return Response({'error': 'Invalid token payload'}, status=401)
+
+        # ✅ Check today's punch status
+        from django.utils import timezone
+        today = timezone.now().date()
+        
+        active_punchin = PunchIn.objects.filter(
+            client_id=client_id,
+            created_by=username,
+            punchin_time__date=today,
+            punchout_time__isnull=True
+        ).first()
+
+        if active_punchin:
+            # User is currently punched in
+            work_duration = timezone.now() - active_punchin.punchin_time
+            hours = work_duration.total_seconds() / 3600
+
+            response_data = {
+                'success': True,
+                'is_punched_in': True,
+                'data': {
+                    'punchin_id': active_punchin.id,
+                    'firm_name': active_punchin.firm.name,
+                    'firm_code': active_punchin.firm.code,
+                    'punchin_time': active_punchin.punchin_time.isoformat(),
+                    'current_work_hours': round(hours, 2),
+                    'photo_url': active_punchin.photo_url,
+                    'address': active_punchin.address,
+                    'status': active_punchin.status
+                }
+            }
+        else:
+            # Check if user has completed punch today
+            completed_today = PunchIn.objects.filter(
+                client_id=client_id,
+                created_by=username,
+                punchin_time__date=today,
+                punchout_time__isnull=False
+            ).first()
+
+            response_data = {
+                'success': True,
+                'is_punched_in': False,
+                'completed_today': completed_today is not None,
+                'data': None
+            }
+
+            if completed_today:
+                work_duration = completed_today.punchout_time - completed_today.punchin_time
+                hours = work_duration.total_seconds() / 3600
+                response_data['data'] = {
+                    'punchin_id': completed_today.id,
+                    'firm_name': completed_today.firm.name,
+                    'punchin_time': completed_today.punchin_time.isoformat(),
+                    'punchout_time': completed_today.punchout_time.isoformat(),
+                    'total_work_hours': round(hours, 2),
+                    'status': completed_today.status
+                }
+
+        return Response(response_data, status=200)
+
+    except DatabaseError as e:
+        logger.error(f"Database error in get_punch_status: {str(e)}")
+        return Response({'error': 'Database error'}, status=500)
+    except Exception as e:
+        logger.error(f"Error in get_punch_status for user {username if 'username' in locals() else 'unknown'}: {str(e)}")
+        return Response({'error': 'Failed to get punch status'}, status=500)
+
+
+
 
 
 
