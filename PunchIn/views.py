@@ -337,7 +337,9 @@ def get_upload_signature(request):
         
         client_id = payload.get('client_id')
         username = payload.get('username')
-        
+        customer_name = request.query_params.get('customerName')
+        print("CustomerName: ",customer_name)
+
         if not client_id or not username:
             return Response({'error': 'Invalid token payload'}, status=401)
         
@@ -352,12 +354,12 @@ def get_upload_signature(request):
         api_secret = cloudinary_config['API_SECRET']
         cloud_name = cloudinary_config['CLOUD_NAME']
         api_key = cloudinary_config['API_KEY']
-        public_id = f"punch_images/{client_id}/{username}/{today_str}"
+        public_id = f"punch_images/{client_id}/{customer_name}/{username}{today_str}"
         # ✅ ONLY include parameters that will be signed
         # Parameters that go into the signature generation
         params_to_sign = {
             'timestamp': timestamp,
-            'folder': f'punch_images/{client_id}/{username}',
+            'folder': f'punch_images/{client_id}/{customer_name}',
             'allowed_formats': 'jpg,png,jpeg',
             'tags': f'client_{client_id},user_{username}',
             'public_id':public_id
