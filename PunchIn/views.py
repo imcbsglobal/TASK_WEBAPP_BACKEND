@@ -598,7 +598,7 @@ def punchout(request):
 
 
 @api_view(['GET'])
-def get_punch_status(request):
+def get_active_punchin(request):
     """
     Get current punch status for authenticated user
     """
@@ -639,6 +639,7 @@ def get_punch_status(request):
                     'firm_code': active_punchin.firm.code,
                     'punchin_time': active_punchin.punchin_time.isoformat(),
                     'current_work_hours': round(hours, 2),
+                    'seconds':work_duration,
                     'photo_url': active_punchin.photo_url,
                     'address': active_punchin.address,
                     'status': active_punchin.status

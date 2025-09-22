@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     shop_location, get_firms, get_table_data, update_location_status,
-    get_upload_signature, punchin, punchout, get_punch_status
+    get_upload_signature, punchin, punchout, get_active_punchin
 )
 
 urlpatterns = [    
@@ -15,5 +15,5 @@ urlpatterns = [
     path("punch-in/cloudinary-signature/", get_upload_signature, name="cloudinary-signature"),
     path("punch-in/", punchin, name="punchin"),
     path("punch-out/", punchout, name="punchout"),
-    path("punch-status/", get_punch_status, name="punch-status"),
+    path("punch-status/", get_active_punchin, name="punch-status"),
 ]
