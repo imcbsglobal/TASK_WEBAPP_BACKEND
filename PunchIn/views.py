@@ -541,6 +541,8 @@ def punchout(request):
         if not client_id or not username:
             return Response({'error': 'Invalid token payload'}, status=401)
 
+        punchinId = request.data.get('punchinId')
+
         # ✅ Get optional data
         notes = request.data.get('notes', '')
 
