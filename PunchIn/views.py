@@ -525,13 +525,13 @@ def punchin(request):
 
 
 @api_view(['POST'])
-def punchout(request):
+def punchout(request ,id):
     """
     Handle punch-out functionality
     """
     try:
         # ✅ Authenticate user
-        payload = decode_jwt_token(request,id)
+        payload = decode_jwt_token(request)
         if not payload:
             return Response({'error': 'Authentication required'}, status=401)
         
@@ -555,7 +555,8 @@ def punchout(request):
             client_id=client_id,
             created_by=username,
             punchin_time__date=today,
-            punchout_time__isnull=True
+            punchout_time__isnull=True,
+            id=punchinId
         ).first()
 
         if not active_punchin:
