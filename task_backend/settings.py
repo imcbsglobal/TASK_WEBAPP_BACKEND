@@ -53,7 +53,7 @@ INSTALLED_APPS = [
 # Add at the bottom
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "https://taskcloud.imcbs.com",  # Your production frontend URL
+    "https://taskprime.app",  
 ]
 from datetime import timedelta
 

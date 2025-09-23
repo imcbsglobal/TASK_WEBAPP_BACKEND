@@ -531,7 +531,7 @@ def punchout(request):
     """
     try:
         # ✅ Authenticate user
-        payload = decode_jwt_token(request)
+        payload = decode_jwt_token(request,id)
         if not payload:
             return Response({'error': 'Authentication required'}, status=401)
         
@@ -541,7 +541,8 @@ def punchout(request):
         if not client_id or not username:
             return Response({'error': 'Invalid token payload'}, status=401)
 
-        punchinId = request.data.get('punchinId')
+        punchinId = id
+        print(punchinId)
 
         # ✅ Get optional data
         notes = request.data.get('notes', '')

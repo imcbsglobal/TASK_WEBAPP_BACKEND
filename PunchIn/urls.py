@@ -14,6 +14,6 @@ urlpatterns = [
     #Punch In/Out System
     path("punch-in/cloudinary-signature/", get_upload_signature, name="cloudinary-signature"),
     path("punch-in/", punchin, name="punchin"),
-    path("punch-out/", punchout, name="punchout"),
+    path("punch-out/<int:id>/", punchout, name="punchout"),
     path("punch-status/", get_active_punchin, name="punch-status"),
 ]
