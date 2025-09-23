@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-%czi_^6texrx)h7@d#x58rp7s#(jl*#idtou14ol%-_%z=)bm4
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['taskcloud.imcbs.com','127.0.0.1']
+ALLOWED_HOSTS = ['taskprime.app','127.0.0.1']
 
 
 CORS_ALLOW_HEADERS = ['*']
