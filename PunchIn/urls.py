@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     shop_location, get_firms, get_table_data, update_location_status,
-    get_upload_signature, punchin, punchout, get_active_punchin
+    get_upload_signature, punchin, punchout, get_active_punchin,punchin_table
 )
 
 urlpatterns = [    
@@ -16,4 +16,5 @@ urlpatterns = [
     path("punch-in/", punchin, name="punchin"),
     path("punch-out/<int:id>/", punchout, name="punchout"),
     path("punch-status/", get_active_punchin, name="punch-status"),
+    path("punch-in/table/",punchin_table,name='punchin_table')
 ]

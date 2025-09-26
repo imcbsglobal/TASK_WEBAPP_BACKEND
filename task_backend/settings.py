@@ -113,6 +113,7 @@ DATABASES = {
         'PASSWORD': 'info@imc',
         'HOST': '88.222.212.14',
         'PORT': '5432',
+         'TIME_ZONE': 'Asia/Kolkata',
     }
 }
 
