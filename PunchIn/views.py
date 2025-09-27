@@ -7,6 +7,7 @@ from django.db.models import OuterRef, Subquery
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from decimal import Decimal, InvalidOperation
 from django.http import JsonResponse
+import uuid
 
 import jwt
 import logging
@@ -355,7 +356,7 @@ def get_upload_signature(request):
         api_secret = cloudinary_config['API_SECRET']
         cloud_name = cloudinary_config['CLOUD_NAME']
         api_key = cloudinary_config['API_KEY']
-        public_id = f"punch_images/{client_id}/{customer_name}/{username}{today_str}"
+        public_id = f"punch_images/{client_id}/{customer_name}/{username}{today_str}{uuid.uuid4().hex[:4]}"
         # ✅ ONLY include parameters that will be signed
         # Parameters that go into the signature generation
         params_to_sign = {
