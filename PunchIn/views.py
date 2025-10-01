@@ -179,7 +179,7 @@ def get_table_data(request):
         startDate = request.GET.get('start_date')
         endDate =request.GET.get('end_date')
         if startDate and endDate:
-            date_filter = f"AND s.created_at BETWEEN '{startDate}' AND '{endDate}'"
+            date_filter = f"AND s.created_at >= '{startDate}' AND s.created_at < '{endDate}'::date + INTERVAL '1 day'"
         else:
             date_filter = ""
 
