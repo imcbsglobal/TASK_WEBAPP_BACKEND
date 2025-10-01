@@ -175,7 +175,18 @@ def get_table_data(request):
             return Response({'error': 'Invalid token payload'}, status=401)
         userRole=payload.get('role')
         userName=payload.get('username')
-        print(userRole)
+        
+        startDate = request.GET.get('start_date')
+        endDate =request.GET.get('end_date')
+        if startDate and endDate:
+            date_filter = f"AND s.created_at BETWEEN '{startDate}' AND '{endDate}'"
+        else:
+            date_filter = ""
+
+
+        print("Start/End date :",startDate ,endDate)
+
+
         from django.db import connection
 
         # ✅ Dynamic table names (no hardcoding)
@@ -200,7 +211,7 @@ def get_table_data(request):
             COALESCE(a.place, 'No address') as firm_place
             FROM {shop_table} s
             LEFT JOIN {firm_table} a ON s.firm_code = a.code AND s.client_id = a.client_id
-            WHERE s.client_id = %s
+            WHERE s.client_id = %s  {date_filter}
             ORDER BY s.created_at DESC
             """
         else :
@@ -218,7 +229,7 @@ def get_table_data(request):
             COALESCE(a.place, 'No address') as firm_place
             FROM {shop_table} s
             LEFT JOIN {firm_table} a ON s.firm_code = a.code AND s.client_id = a.client_id
-            WHERE s.client_id = %s AND s.created_by = '{userName}'
+            WHERE s.client_id = %s AND s.created_by = '{userName}'  {date_filter}
             ORDER BY s.created_at DESC
             """
 
