@@ -184,7 +184,7 @@ def get_table_data(request):
             date_filter = ""
 
 
-        print("Start/End date :",startDate ,endDate)
+        # print("Start/End date :",startDate ,endDate)
 
 
         from django.db import connection
@@ -714,6 +714,14 @@ def punchin_table(request):
         
         user_role = payload.get('role')
         username = payload.get('username')
+        startDate = request.GET.get('start_date')
+        endDate =request.GET.get('end_date')
+
+        if startDate and endDate:
+            date_filter = f"AND p.created_at >= '{startDate}' AND p.created_at < '{endDate}'::date + INTERVAL '1 day'"
+        else:
+            date_filter = ""
+
         
         from django.db import connection
 
@@ -744,7 +752,7 @@ def punchin_table(request):
                 COALESCE(a.place, 'No address') as firm_place
             FROM {punchin_table} p
             LEFT JOIN {firm_table} a ON p.firm_code = a.code AND p.client_id = a.client_id
-            WHERE p.client_id = %s
+            WHERE p.client_id = %s {date_filter}
             ORDER BY p.punchin_time DESC
             """
             query_params = [client_id]
@@ -770,7 +778,7 @@ def punchin_table(request):
                 COALESCE(a.place, 'No address') as firm_place
             FROM {punchin_table} p
             LEFT JOIN {firm_table} a ON p.firm_code = a.code AND p.client_id = a.client_id
-            WHERE p.client_id = %s AND p.created_by = %s
+            WHERE p.client_id = %s AND p.created_by = %s {date_filter}
             ORDER BY p.punchin_time DESC
             """
             query_params = [client_id, username]
