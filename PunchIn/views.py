@@ -147,6 +147,7 @@ def get_firms(request):
                 'id': firm.code,
                 'firm_name': firm.name,
                 'latitude': float(firm.latitude) if firm.latitude is not None else None,
+                'area':firm.area,
                 'longitude': float(firm.longitude) if firm.longitude is not None else None,
             }
             for firm in firms
