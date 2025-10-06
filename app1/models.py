@@ -20,7 +20,7 @@ class AccUser(models.Model):
 
     class Meta:
         db_table = 'acc_users'
-        managed  = False          # table already exists  # table already exists
+        managed  = False          # table already exists 
 
 
 
