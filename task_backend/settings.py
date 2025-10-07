@@ -47,7 +47,8 @@ INSTALLED_APPS = [
     'app1',
     'PunchIn',
     'corsheaders',
-    'cloudinary'
+    'cloudinary',
+    'DebtorsAPI'
 ]
 
 # Add at the bottom

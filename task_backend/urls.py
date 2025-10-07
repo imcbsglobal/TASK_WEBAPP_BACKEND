@@ -21,5 +21,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('app1.urls')),
     path('api/', include('PunchIn.urls')),
+    path('api/debtors/', include('DebtorsAPI.urls')),
     
 ]
