@@ -74,4 +74,39 @@ def update_user_menu(request):
             {'error': 'An unexpected error occurred. Please try again later.'}, 
         )
     
-    
+
+@api_view(['GET'])
+
+def get_user_menus(request):
+        
+    try:
+            payload = decode_jwt_token(request)
+            if not payload:
+                return Response({'error': 'Invalid or missing token'}, status=401)
+            
+            role = payload.get('role')
+            if role != 'Admin':
+                return Response(
+                {"detail": "Only admin can get menus."},
+                status=status.HTTP_403_FORBIDDEN
+                )
+            client_id = request.data.get("client_id")
+            username = request.data.get("user_id")
+
+            records = AllowedMenu.objects.filter(user_id=username,
+            client_id=client_id
+            ).first()
+
+            
+            return Response({
+            "success": True,
+            "user":username,
+            "allowedMenuIds": records.allowedMenuIds
+            },status=200)
+
+            
+    except Exception as e:
+            return Response(
+            {'error': 'An unexpected error occurred to get user menu. Please try again later.'}, 
+        )
+            
