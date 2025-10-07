@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import jwt
 from django.conf import settings
 from .models import AccUser, Misel, AccMaster, AccLedgers, AccInvmast,CashAndBankAccMaster
-
+from accesscontroll.models import AllowedMenu
 
 
 
@@ -35,8 +35,48 @@ def login(request):
 
     if account_code and account_code != user.accountcode:
         return Response({'success': False, 'error': 'Invalid account code'}, status=401)
-
+    
     role = "Admin" if (user.role and user.role.strip().lower() == "level 3") else "User"
+
+
+
+    if role == "Admin":
+       allowedMenuIds= [
+     "item-details",
+    "bank-cash",
+    "cash-book",
+    "bank-book",
+    "debtors",
+    "company",
+    "punch-in",
+    "location-capture",
+    "punch-in-action",
+    "master",
+    "user-menu",
+    "settings"
+    ]
+    else :    
+        try:
+        # Fetch allowed menu IDs for the user
+            allowedMenuIds = AllowedMenu.objects.filter(
+            user_id=user.id, client_id=client_id
+            ).values_list('allowedMenuIds',flat=True).first()
+
+
+        # If no allowed menus found, default to ['company']
+            if not allowedMenuIds:
+                allowedMenuIds = ['company']
+
+        except AllowedMenu.DoesNotExist:
+        # This usually won't trigger with filter(), but included for safety
+            allowedMenuIds = ['company']
+
+        except Exception as e:
+        # Log the error in production
+            print(f"Error fetching AllowedMenuIds: {e}")
+            return Response({'success': False, "error": "Error fetching AllowedMenuIds"}, status=500)
+
+     
 
     # Create custom JWT token with user data
     payload = {
@@ -46,7 +86,7 @@ def login(request):
         'role': role,
         'accountcode': user.accountcode,
         'exp': datetime.utcnow() + timedelta(hours=24),  # Token expires in 24 hours
-        'iat': datetime.utcnow()
+        'iat': datetime.utcnow(),
     }
     
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
@@ -58,7 +98,9 @@ def login(request):
             'role': role,
             'client_id': user.client_id,
             'accountcode': user.accountcode,
-            'login_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'login_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'allowedMenuIds':allowedMenuIds
+
         },
         'token': token,
     })
