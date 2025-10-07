@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     'PunchIn',
     'corsheaders',
     'cloudinary',
-    'DebtorsAPI'
+    'DebtorsAPI',
     'accesscontroll'
 ]
 
