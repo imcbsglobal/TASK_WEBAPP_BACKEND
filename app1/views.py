@@ -39,7 +39,7 @@ def login(request):
     role = "Admin" if (user.role and user.role.strip().lower() == "level 3") else "User"
 
 
-
+# replace this with menuconfig function
     if role == "Admin":
        allowedMenuIds= [
      "item-details",

@@ -44,13 +44,14 @@ def update_user_menu(request):
                 return Response({'error': 'Invalid or missing token'}, status=401)
             
             role = payload.get('role')
+            print(role)
             if role != 'Admin':
                 return Response(
                 {"detail": "Only admin can update this."},
                 status=status.HTTP_403_FORBIDDEN
                 )
 
-            client_id = request.data.get("client_id")
+            client_id = payload.get("client_id")
             username = request.data.get("user_id")
             allowedMenuIds = request.data.get("allowedMenuIds", [])
 
@@ -85,13 +86,16 @@ def get_user_menus(request):
                 return Response({'error': 'Invalid or missing token'}, status=401)
             
             role = payload.get('role')
-            if role != 'Admin':
+            print(role)
+            if role != 'Admin' or 'admin':
                 return Response(
                 {"detail": "Only admin can get menus."},
                 status=status.HTTP_403_FORBIDDEN
                 )
-            client_id = request.data.get("client_id")
-            username = request.data.get("user_id")
+            # client_id from admin && username from req.data body
+            client_id = payload.get("client_id")
+            # username = request.data.get("user_id")
+            username = request.GET.get("user_id")
 
             records = AllowedMenu.objects.filter(user_id=username,
             client_id=client_id
@@ -106,7 +110,9 @@ def get_user_menus(request):
 
             
     except Exception as e:
-            return Response(
-            {'error': 'An unexpected error occurred to get user menu. Please try again later.'}, 
-        )
+        return Response(
+        {'error': f'An unexpected error occurred while getting the user menu: {e}'},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+    )
+
             
