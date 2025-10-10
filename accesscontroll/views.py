@@ -45,7 +45,7 @@ def update_user_menu(request):
             
             role = payload.get('role')
             print(role)
-            if role != 'Admin':
+            if role.lower() != 'admin':
                 return Response(
                 {"detail": "Only admin can update this."},
                 status=status.HTTP_403_FORBIDDEN
@@ -86,8 +86,8 @@ def get_user_menus(request):
                 return Response({'error': 'Invalid or missing token'}, status=401)
             
             role = payload.get('role')
-            print(role)
-            if role != 'Admin' or 'admin':
+            # print(role ,"xio" if role == 'Admin' else "umn")
+            if role.lower() != 'admin':
                 return Response(
                 {"detail": "Only admin can get menus."},
                 status=status.HTTP_403_FORBIDDEN
