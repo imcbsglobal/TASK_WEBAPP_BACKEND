@@ -16,6 +16,7 @@ from rest_framework import status
     # "punch-in",
     # "location-capture",
     # "punch-in-action",
+    # "area-assign"
     # "master",
     # "user-menu",
     # "settings"
@@ -101,6 +102,14 @@ def get_user_menus(request):
             client_id=client_id
             ).first()
 
+            if not records:
+                return Response({
+                    "success": True,
+                    "user": username,
+                    "allowedMenuIds": ["company"]
+                }, status=200)
+
+            
             
             return Response({
             "success": True,

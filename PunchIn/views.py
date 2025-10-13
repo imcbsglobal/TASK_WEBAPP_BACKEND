@@ -14,9 +14,9 @@ import logging
 import time
 import hashlib
 
-from .models import ShopLocation, PunchIn
+from .models import ShopLocation, PunchIn, UserAreas
 from .serializers import ShopLocationSerializer
-from app1.models import Misel, AccMaster
+from app1.models import Misel, AccMaster, AccUser
 
 logger = logging.getLogger(__name__)
 
@@ -872,88 +872,111 @@ def punchin_table(request):
         return Response({'error': 'Failed to get punch-in records'}, status=500)
 
 
+@api_view(['GET'])
+def get_areas(request):
+    try:
+        payload = decode_jwt_token(request)
+        if not payload:
+            return Response({'error': 'Invalid or missing token'}, status=401)
 
-#  id | latitude  | longitude | client_id |         punchin_time          |         punchout_time         |                                                                                                 photo_url                                                                                                  |  status   |          created_at           |          updated_at           | firm_code | address | created_by | notes
-# ----+-----------+-----------+-----------+-------------------------------+-------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------+-------------------------------+-------------------------------+-----------+---------+------------+-------
-#   1 | 11.617994 | 76.081437 | SYSMAC    | 2025-09-19 06:08:45.637841+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758262122/punch_images/SYSMAC/ARUN/p77tk6m44qmv5yapdlsj.jpg                                                                                            | pending   | 2025-09-19 06:08:45.637887+00 | 2025-09-19 06:08:45.637893+00 | 00918     |         | ARUN       |
-#   2 | 11.617994 | 76.081437 | SYSMAC    | 2025-09-19 06:10:42.223465+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758262238/punch_images/SYSMAC/ARUN/hpshgisc6ikvtx7yfqyu.jpg                                                                                            | pending   | 2025-09-19 06:10:42.223565+00 | 2025-09-19 06:10:42.223577+00 | 00918     |         | ARUN       |
-#   3 | 11.617994 | 76.081437 | SYSMAC    | 2025-09-19 06:13:02.379596+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758262379/punch_images/SYSMAC/ARUN/lwl9s35gi2s0lqonozjn.jpg                                                                                            | pending   | 2025-09-19 06:13:02.379646+00 | 2025-09-19 06:13:02.379652+00 | 00918     |         | ARUN       |
-#   4 | 11.617990 | 76.081440 | SYSMAC    | 2025-09-19 06:13:44.029351+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758258546/punch_images/SYSMAC/ARUN/vr66o6wls8x4agwrz8bf.jpg                                                                                            | pending   | 2025-09-19 06:13:44.029451+00 | 2025-09-19 06:13:44.029457+00 | 00918     |         | ARUN       |
-#   5 | 11.617994 | 76.081437 | SYSMAC    | 2025-09-19 06:51:01.311328+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758264658/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 06:51:01.311378+00 | 2025-09-19 06:51:01.311384+00 | 00930     |         | ARUN       |
-#   6 | 11.617994 | 76.081437 | SYSMAC    | 2025-09-19 07:01:29.657624+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758265286/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 07:01:29.657663+00 | 2025-09-19 07:01:29.657668+00 | 00918     |         | ARUN       |
-#   7 | 11.617996 | 76.081440 | SYSMAC    | 2025-09-19 09:14:14.106415+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758273250/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 09:14:14.106477+00 | 2025-09-19 09:14:14.106482+00 | 00931     |         | ARUN       |
-#   8 | 11.618095 | 76.081223 | SYSMAC    | 2025-09-19 10:52:51.463708+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758279170/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 10:52:51.463756+00 | 2025-09-19 10:52:51.463761+00 | 00930     |         | ARUN       |
-#   9 | 11.618071 | 76.081289 | SYSMAC    | 2025-09-19 11:04:56.377473+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758279895/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 11:04:56.377537+00 | 2025-09-19 11:04:56.377546+00 | 00933     |         | ARUN       |
-#  10 | 11.618069 | 76.081286 | SYSMAC    | 2025-09-19 11:06:40.977501+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758280000/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 11:06:40.977546+00 | 2025-09-19 11:06:40.97755+00  | 00936     |         | ARUN       |
-#  11 | 11.618069 | 76.081286 | SYSMAC    | 2025-09-19 11:07:34.457512+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758280053/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 11:07:34.457552+00 | 2025-09-19 11:07:34.457555+00 | 00936     |         | ARUN       |
-#  12 | 11.618069 | 76.081286 | SYSMAC    | 2025-09-19 11:08:32.09833+00  |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758280111/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 11:08:32.098362+00 | 2025-09-19 11:08:32.098365+00 | 00934     |         | ARUN       |
-#  13 | 11.618071 | 76.081289 | SYSMAC    | 2025-09-19 11:10:54.28611+00  |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758280253/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 11:10:54.286138+00 | 2025-09-19 11:10:54.286141+00 | 00995     |         | ARUN       |
-#  14 | 11.617996 | 76.081433 | SYSMAC    | 2025-09-19 11:26:06.572109+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758281163/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 11:26:06.572158+00 | 2025-09-19 11:26:06.572164+00 | 00930     |         | ARUN       |
-#  15 | 11.617996 | 76.081433 | SYSMAC    | 2025-09-19 11:32:29.439105+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758281546/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/KAILASH%20BAKERY/ARUN2025-09-19.jpg                                                             | pending   | 2025-09-19 11:32:29.439151+00 | 2025-09-19 11:32:29.439157+00 | 00982     |         | ARUN       |
-#  16 | 11.617996 | 76.081433 | SYSMAC    | 2025-09-19 11:34:10.232929+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758281646/punch_images/SYSMAC/TOP%20IN%20TOWN%20RETAIL%20%28BTM%29/punch_images/SYSMAC/TOP%20IN%20TOWN%20RETAIL%20%28BTM%29/ARUN2025-09-19.jpg         | pending   | 2025-09-19 11:34:10.232975+00 | 2025-09-19 11:34:10.232981+00 | 00932     |         | ARUN       |
-#  17 | 11.618071 | 76.081289 | SYSMAC    | 2025-09-19 11:35:08.412546+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758281707/punch_images/SYSMAC/ARUN/punch_images/SYSMAC/ARUN/2025-09-19.jpg                                                                             | pending   | 2025-09-19 11:35:08.412592+00 | 2025-09-19 11:35:08.412596+00 | 00933     |         | ARUN       |
-#  18 | 11.618070 | 76.081286 | SYSMAC    | 2025-09-19 11:41:59.188002+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758282118/punch_images/SYSMAC/MAHABAZAR%28VARTHUR%29/punch_images/SYSMAC/MAHABAZAR%28VARTHUR%29/ARUN2025-09-19.jpg                                     | pending   | 2025-09-19 11:41:59.18804+00  | 2025-09-19 11:41:59.188044+00 | 00996     |         | ARUN       |
-#  19 | 11.618070 | 76.081286 | SYSMAC    | 2025-09-19 11:44:16.200782+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758282255/punch_images/SYSMAC/SUHAIL%28FUN%20WORLD%29/punch_images/SYSMAC/SUHAIL%28FUN%20WORLD%29/ARUN2025-09-19.jpg                                   | pending   | 2025-09-19 11:44:16.200838+00 | 2025-09-19 11:44:16.200842+00 | 00983     |         | ARUN       |
-#  20 | 11.617996 | 76.081438 | SYSMAC    | 2025-09-22 04:48:23.940201+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758516498/punch_images/SYSMAC/CRAFT%20SUPER%20MARKET/punch_images/SYSMAC/CRAFT%20SUPER%20MARKET/ARUN2025-09-22.jpg                                     | pending   | 2025-09-22 04:48:23.940249+00 | 2025-09-22 04:48:23.940254+00 | 00931     |         | ARUN       |
-#  21 | 11.617990 | 76.081440 | SYSMAC    | 2025-09-22 09:11:30.322979+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758258546/punch_images/SYSMAC/ARUN/vr66o6wls8x4agwrz8bf.jpg                                                                                            | pending   | 2025-09-22 09:11:30.323061+00 | 2025-09-22 09:11:30.323071+00 | 00918     |         | ARUN       |
-#  22 | 11.617994 | 76.081435 | SYSMAC    | 2025-09-22 11:03:03.987357+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758538978/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-22.jpg                                                         | pending   | 2025-09-22 11:03:03.987404+00 | 2025-09-22 11:03:03.98741+00  | 00918     |         | ARUN       |
-#  23 | 11.617994 | 76.081435 | SYSMAC    | 2025-09-22 11:07:08.29524+00  |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758539220/punch_images/SYSMAC/CRAFT%20SUPER%20MARKET/punch_images/SYSMAC/CRAFT%20SUPER%20MARKET/ARUN2025-09-22.jpg                                     | pending   | 2025-09-22 11:07:08.295301+00 | 2025-09-22 11:07:08.295308+00 | 00931     |         | ARUN       |
-#  24 | 11.617994 | 76.081437 | SYSMAC    | 2025-09-23 04:04:38.802297+00 | 2025-09-23 05:30:17.583276+00 | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758600278/punch_images/SYSMAC/IN%20AND%20OUT/punch_images/SYSMAC/IN%20AND%20OUT/ARUN2025-09-23.jpg                                                     | completed | 2025-09-23 04:04:38.802763+00 | 2025-09-23 05:30:17.583564+00 | 00930     |         | ARUN       |
-#  25 | 11.617990 | 76.081440 | SYSMAC    | 2025-09-23 06:09:47.917104+00 | 2025-09-23 07:03:05.586452+00 | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758258546/punch_images/SYSMAC/ARUN/vr66o6wls8x4agwrz8bf.jpg                                                                                            | completed | 2025-09-23 06:09:47.917163+00 | 2025-09-23 07:03:05.586615+00 | 00918     |         | ARUN       |
-#  26 | 11.617990 | 76.081440 | SYSMAC    | 2025-09-23 07:47:45.410429+00 | 2025-09-23 07:47:51.148287+00 | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758258546/punch_images/SYSMAC/ARUN/vr66o6wls8x4agwrz8bf.jpg                                                                                            | completed | 2025-09-23 07:47:45.410478+00 | 2025-09-23 07:47:51.148396+00 | 00918     |         | ARUN       |
-#  27 | 11.617990 | 76.081440 | SYSMAC    | 2025-09-23 07:48:14.562321+00 | 2025-09-23 07:49:39.347074+00 | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758258546/punch_images/SYSMAC/ARUN/vr66o6wls8x4agwrz8bf.jpg                                                                                            | completed | 2025-09-23 07:48:14.562474+00 | 2025-09-23 07:49:39.347195+00 | 00918     |         | ARUN       |
-#  29 | 11.617996 | 76.081438 | SYSMAC    | 2025-09-23 08:02:28.305689+00 | 2025-09-23 09:06:01.485035+00 | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758614547/punch_images/SYSMAC/TOP%20IN%20TOWN%20RETAIL%20%28BTM%29/punch_images/SYSMAC/TOP%20IN%20TOWN%20RETAIL%20%28BTM%29/ARUN2025-09-23.jpg         | completed | 2025-09-23 08:02:28.306497+00 | 2025-09-23 09:06:01.4854+00   | 00932     |         | ARUN       |
-#  28 | 11.617990 | 76.081440 | SYSMAC    | 2025-09-23 07:58:45.311472+00 | 2025-09-23 09:21:21.584773+00 | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758258546/punch_images/SYSMAC/ARUN/vr66o6wls8x4agwrz8bf.jpg                                                                                            | completed | 2025-09-23 07:58:45.311519+00 | 2025-09-23 09:21:21.58488+00  | 00918     |         | ARUN       |
-#  30 | 11.617998 | 76.081451 | SYSMAC    | 2025-09-23 09:22:58.097144+00 | 2025-09-23 09:24:33.722754+00 | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758619371/punch_images/SYSMAC/ATHULYA%20DEPARTMENT%20STORE%20%28ANL%29/punch_images/SYSMAC/ATHULYA%20DEPARTMENT%20STORE%20%28ANL%29/ARUN2025-09-23.jpg | completed | 2025-09-23 09:22:58.097195+00 | 2025-09-23 09:24:33.722859+00 | 00933     |         | ARUN       |
-#  31 | 11.617996 | 76.081438 | SYSMAC    | 2025-09-23 09:25:13.122221+00 | 2025-09-23 11:48:40.237942+00 | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758619506/punch_images/SYSMAC/CRAFT%20SUPER%20MARKET/punch_images/SYSMAC/CRAFT%20SUPER%20MARKET/ARUN2025-09-23.jpg                                     | completed | 2025-09-23 09:25:13.122262+00 | 2025-09-23 11:48:40.238253+00 | 00931     |         | ARUN       |
-#  32 | 11.618063 | 76.081297 | SYSMAC    | 2025-09-23 12:13:44.509502+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758629623/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-23.jpg                                                         | pending   | 2025-09-23 12:13:44.509555+00 | 2025-09-23 12:13:44.509559+00 | 00918     |         | ARUN       |
-#  33 | 11.617996 | 76.081438 | SYSMAC    | 2025-09-23 12:18:32.761606+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758629906/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-23.jpg                                                         | pending   | 2025-09-23 12:18:32.761664+00 | 2025-09-23 12:18:32.76167+00  | 00918     |         | ARUN       |
-#  34 | 11.617996 | 76.081438 | SYSMAC    | 2025-09-23 12:18:56.390422+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758629928/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-23.jpg                                                         | pending   | 2025-09-23 12:18:56.390464+00 | 2025-09-23 12:18:56.390468+00 | 00918     |         | ARUN       |
-#  35 | 11.617996 | 76.081438 | SYSMAC    | 2025-09-23 12:20:04.092721+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758629995/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-23.jpg                                                         | pending   | 2025-09-23 12:20:04.092761+00 | 2025-09-23 12:20:04.092765+00 | 00918     |         | ARUN       |
-#  36 | 11.617996 | 76.081438 | SYSMAC    | 2025-09-23 12:21:27.265211+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758630080/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-23.jpg                                                         | pending   | 2025-09-23 12:21:27.265251+00 | 2025-09-23 12:21:27.265256+00 | 00918     |         | ARUN       |
-#  37 | 11.617994 | 76.081435 | SYSMAC    | 2025-09-23 12:24:12.818839+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758630246/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-23.jpg                                                         | pending   | 2025-09-23 12:24:12.818883+00 | 2025-09-23 12:24:12.818889+00 | 00918     |         | ARUN       |
-#  38 | 11.617996 | 76.081433 | SYSMAC    | 2025-09-23 12:28:25.849712+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758630499/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-23.jpg                                                         | pending   | 2025-09-23 12:28:25.849754+00 | 2025-09-23 12:28:25.849759+00 | 00918     |         | ARUN       |
-#  39 | 11.618088 | 76.081476 | SYSMAC    | 2025-09-23 12:32:06.254666+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758630725/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-23.jpg                                                         | pending   | 2025-09-23 12:32:06.254702+00 | 2025-09-23 12:32:06.254705+00 | 00918     |         | ARUN       |
-#  40 | 11.617994 | 76.081437 | SYSMAC    | 2025-09-24 05:13:42.286584+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758690815/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-24.jpg                                                         | pending   | 2025-09-24 05:13:42.286637+00 | 2025-09-24 05:13:42.286643+00 | 00918     |         | ARUN       |
-#  41 | 11.617998 | 76.081430 | SYSMAC    | 2025-09-24 05:16:26.788311+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758690979/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-24.jpg                                                         | pending   | 2025-09-24 05:16:26.788351+00 | 2025-09-24 05:16:26.788356+00 | 00918     |         | ARUN       |
-#  42 | 11.617994 | 76.081435 | SYSMAC    | 2025-09-24 06:12:17.157971+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758694330/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-24.jpg                                                         | pending   | 2025-09-24 06:12:17.158032+00 | 2025-09-24 06:12:17.158037+00 | 00918     |         | ARUN       |
-#  43 | 11.617994 | 76.081437 | SYSMAC    | 2025-09-24 06:14:13.006624+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758694446/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-24.jpg                                                         | pending   | 2025-09-24 06:14:13.006666+00 | 2025-09-24 06:14:13.00667+00  | 00918     |         | ARUN       |
-#  44 | 11.617923 | 76.081499 | SYSMAC    | 2025-09-24 06:23:32.148799+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758695005/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-24.jpg                                                         | pending   | 2025-09-24 06:23:32.148842+00 | 2025-09-24 06:23:32.148885+00 | 00918     |         | ARUN       |
-#  45 | 11.617994 | 76.081435 | SYSMAC    | 2025-09-24 06:48:06.695276+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758696479/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-24.jpg                                                         | pending   | 2025-09-24 06:48:06.695397+00 | 2025-09-24 06:48:06.69541+00  | 00918     |         | ARUN       |
-#  46 | 11.618074 | 76.081282 | SYSMAC    | 2025-09-24 06:56:42.406064+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758697001/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-24.jpg                                                         | pending   | 2025-09-24 06:56:42.406989+00 | 2025-09-24 06:56:42.407+00    | 00918     |         | ARUN       |
-#  47 | 11.618000 | 76.081449 | SYSMAC    | 2025-09-24 09:55:56.1814+00   |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758707749/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-24.jpg                                                         | pending   | 2025-09-24 09:55:56.181537+00 | 2025-09-24 09:55:56.181544+00 | 00918     |         | ARUN       |
-#  48 | 11.617994 | 76.081435 | SYSMAC    | 2025-09-24 11:18:26.467094+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758712699/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-24.jpg                                                         | pending   | 2025-09-24 11:18:26.467162+00 | 2025-09-24 11:18:26.467167+00 | 00918     |         | ARUN       |
-#  49 | 11.617994 | 76.081435 | SYSMAC    | 2025-09-25 06:31:47.058964+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758781905/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-25.jpg                                                         | pending   | 2025-09-25 06:31:47.059764+00 | 2025-09-25 06:31:47.059778+00 | 00918     |         | ARUN       |
-#  50 | 11.617994 | 76.081435 | SYSMAC    | 2025-09-25 07:04:45.862512+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758783885/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-25.jpg                                                         | pending   | 2025-09-25 07:04:45.863334+00 | 2025-09-25 07:04:45.863342+00 | 00918     |         | ARUN       |
-#  51 | 11.617994 | 76.081435 | SYSMAC    | 2025-09-25 07:08:12.641898+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758784084/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-25.jpg                                                         | pending   | 2025-09-25 07:08:12.641947+00 | 2025-09-25 07:08:12.641953+00 | 00918     |         | ARUN       |
-#  52 | 11.617996 | 76.081438 | SYSMAC    | 2025-09-25 10:51:27.356252+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758797480/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-25.jpg                                                         | pending   | 2025-09-25 10:51:27.356299+00 | 2025-09-25 10:51:27.356305+00 | 00918     |         | ARUN       |
-#  53 | 11.617996 | 76.081433 | SYSMAC    | 2025-09-25 10:55:03.874909+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758797694/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-25.jpg                                                         | pending   | 2025-09-25 10:55:03.874949+00 | 2025-09-25 10:55:03.874954+00 | 00918     |         | ARUN       |
-#  54 | 11.617916 | 76.081499 | SYSMAC    | 2025-09-25 10:58:27.461031+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758797900/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-25.jpg                                                         | pending   | 2025-09-25 10:58:27.461073+00 | 2025-09-25 10:58:27.461077+00 | 00918     |         | ARUN       |
-#  55 | 11.617996 | 76.081433 | SYSMAC    | 2025-09-25 11:21:24.081038+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758799276/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-25.jpg                                                         | pending   | 2025-09-25 11:21:24.081079+00 | 2025-09-25 11:21:24.081084+00 | 00918     |         | ARUN       |
-#  56 | 11.617924 | 76.081500 | SYSMAC    | 2025-09-26 04:45:36.529748+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758861935/punch_images/SYSMAC/ARUN%20KUMAR/punch_images/SYSMAC/ARUN%20KUMAR/ARUN2025-09-26.jpg                                                         | pending   | 2025-09-26 04:45:36.529943+00 | 2025-09-26 04:45:36.529952+00 | 00918     |         | ARUN       |
-#  57 | 11.618065 | 76.081296 | SYSMAC    | 2025-09-26 04:55:03.827299+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758862503/punch_images/SYSMAC/CRAFT%20SUPER%20MARKET/punch_images/SYSMAC/CRAFT%20SUPER%20MARKET/ARUN2025-09-26.jpg                                     | pending   | 2025-09-26 04:55:03.828408+00 | 2025-09-26 04:55:03.828418+00 | 00931     |         | ARUN       |
-#  58 | 11.617996 | 76.081438 | SYSMAC    | 2025-09-26 05:00:45.607822+00 |                               | https://res.cloudinary.com/dfbei9mv1/image/upload/v1758862844/punch_images/SYSMAC/QUALITY%20MART%20%28KASTURI%20NAGAR%29/punch_images/SYSMAC/QUALITY%20MART%20%28KASTURI%20NAGAR%29/ARUN2025-09-26.jpg     | pending   | 2025-09-26 05:00:45.607861+00 | 2025-09-26 05:00:45.607866+00 | 00936     |         | ARUN       |
-# (58 rows)
+        client_id = payload.get('client_id')
+        if not client_id:
+            return Response({'error': 'Invalid token payload'}, status=401)
+        
+        areas =AccMaster.objects.filter(client_id=client_id).values_list('area',flat=True).distinct()
+        # areas =[a for a in areas if a]
+        return Response({
+            "status":"True",
+            "areas":areas
+        },status=200)
 
-# ~
-# ~
-# ~
-# ~
-# ~
-# ~
-# ~
-# ~
-# ~
-# ~
-# ~
-# ~
-# ~
-# ~
-# ~
+    except Exception as e:
+        logger.error(f"Error in areas: {str(e)}")
+        return Response({'error': 'Failed to get area records'}, status=500)
 
-
-
-
+@api_view(['POST'])
+def update_area(request):
+    """
+    Update user areas - Add or remove area codes for a user
+    Expects: { "user_id": "ARUN", "area_codes": ["AREA1", "AREA2", "AREA3"] }
+    """
+    try:
+        # ✅ Authenticate admin/manager
+        payload = decode_jwt_token(request)
+        if not payload:
+            return Response({'error': 'Authentication required'}, status=401)
+        
+        client_id = payload.get('client_id')
+        admin_username = payload.get('username')
+        admin_role = payload.get('role')
+        
+        if not client_id:
+            return Response({'error': 'Invalid token payload'}, status=401)
+        
+        # Optional: Check if user has permission to update areas
+        # if admin_role not in ['Admin', 'Manager']:
+        #     return Response({'error': 'Insufficient permissions'}, status=403)
+        
+        # ✅ Get request data
+        user_id = request.data.get('user_id')
+        area_codes = request.data.get('area_codes', [])
+        
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=400)
+        
+        if not isinstance(area_codes, list):
+            return Response({'error': 'area_codes must be an array'}, status=400)
+        
+        # ✅ Verify user exists
+        try:
+            user = AccUser.objects.get(id=user_id, client_id=client_id)
+        except AccUser.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        
+        # ✅ Update user areas atomically
+        with transaction.atomic():
+            # Delete existing areas for this user
+            deleted_count = UserAreas.objects.filter(user=user).delete()[0]
+            
+            # Add new areas
+            new_areas = []
+            for area_code in area_codes:
+                if area_code:  # Skip empty strings
+                    new_areas.append(
+                        UserAreas(
+                            user=user,
+                            area_code=area_code.strip()
+                        )
+                    )
+            
+            # Bulk create new areas
+            if new_areas:
+                UserAreas.objects.bulk_create(new_areas, ignore_conflicts=True)
+            
+            # Get updated areas
+            updated_areas = list(
+                UserAreas.objects.filter(user=user).values_list('area_code', flat=True)
+            )
+        
+        logger.info(f"Areas updated for user {user_id} by {admin_username}. Removed: {deleted_count}, Added: {len(new_areas)}")
+        
+        return Response({
+            'success': True,
+            'message': 'User areas updated successfully',
+            'data': {
+                'user_id': user_id,
+                'areas_removed': deleted_count,
+                'areas_added': len(new_areas),
+                'current_areas': updated_areas
+            }
+        }, status=200)
+        
+    except DatabaseError as e:
+        logger.error(f"Database error in update_area: {str(e)}")
+        return Response({'error': 'Database operation failed'}, status=500)
+    except Exception as e:
+        logger.error(f"Error in update_area: {str(e)}")
+        return Response({'error': 'Failed to update user areas'}, status=500)
 
 @api_view(['GET'])
 def health_check(request):

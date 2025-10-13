@@ -1,5 +1,5 @@
 from django.db import models
-from app1.models import Misel,AccMaster  # import Misel model from your main app
+from app1.models import Misel,AccMaster,AccUser  # import Misel model from your main app
 
 
 class ShopLocation(models.Model):
@@ -86,3 +86,21 @@ class PunchIn(models.Model):
 
     def __str__(self):
         return f"{self.created_by} - {self.firm.name} - {self.punchin_time.strftime('%Y-%m-%d %H:%M')}"
+    
+
+
+class UserAreas(models.Model):
+    user= models.ForeignKey(AccUser,
+        to_field="id",
+        db_column="user_id",
+        on_delete=models.CASCADE,
+        db_constraint=False,
+        related_name="Areas" )
+    
+    area_code =models.CharField(max_length=64,db_column="area_code")
+
+    class Meta:
+        db_table= "user_areas"
+        constraints = [
+            models.UniqueConstraint(fields=["user", "area_code"], name="uniq_user_area"),
+        ]
