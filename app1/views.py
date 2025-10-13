@@ -51,6 +51,7 @@ def login(request):
     "punch-in",
     "location-capture",
     "punch-in-action",
+    "area-assign",
     "master",
     "user-menu",
     "settings"
