@@ -56,6 +56,7 @@ class AccMaster(models.Model):
     """
     code = models.CharField(max_length=30, primary_key=True)
     name = models.CharField(max_length=200, blank=True, null=True)#
+    super_code = models.CharField(max_length=5, blank=True, null=True)
     opening_balance = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)#
     debit = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)#
     credit = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)#

@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/', include('app1.urls')),
     path('api/', include('PunchIn.urls')),
     path('api/debtors/', include('DebtorsAPI.urls')),
-    path('api/',include('accesscontroll.urls'))
+    path('api/',include('accesscontroll.urls')),
+    path('api/suppiers_api/', include('suppiers_api.urls')),
     
 ]
