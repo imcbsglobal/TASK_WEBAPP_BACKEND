@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'cloudinary',
     'DebtorsAPI',
+    'suppiers_api',
     'accesscontroll'
 ]
 
