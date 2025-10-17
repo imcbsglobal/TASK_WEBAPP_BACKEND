@@ -987,6 +987,59 @@ def get_areas(request):
         logger.error(f"Error in areas: {str(e)}")
         return Response({'error': 'Failed to get area records'}, status=500)
 
+
+@api_view(['GET'])
+def get_user_areas(request):
+    """
+    Get areas assigned to a specific user
+    """
+    try:
+        # ✅ Authenticate user
+        payload = decode_jwt_token(request)
+        if not payload:
+            return Response({'error': 'Authentication required'}, status=401)
+        
+        client_id = payload.get('client_id')
+        logged_in_username = payload.get('username')
+        
+        if not client_id:
+            return Response({'error': 'Invalid token payload'}, status=401)
+        
+        # ✅ Get user_id from query params or use logged-in user
+        user_id = request.GET.get('user_id')
+
+        if not user_id :
+            return Response({'error':'User Id not found'},status=404)
+        # print("UID",user_id)
+        
+        # ✅ Verify user exists
+        try:
+            user = AccUser.objects.get(id=user_id, client_id=client_id)
+        except AccUser.DoesNotExist:
+            return Response({
+                'error': 'User not found',
+                'user_id': user_id
+            }, status=404)
+        
+        # ✅ Get user's assigned areas
+        user_areas = UserAreas.objects.filter(user=user_id).values_list('area_code', flat=True)
+        area_list = list(user_areas)
+ 
+        return Response({
+            'success': True,
+            'user_id': user_id,
+            'total_areas': len(area_list),
+            'areas': area_list,
+        }, status=200)
+        
+    except DatabaseError as e:
+        logger.error(f"Database error in get_user_areas: {str(e)}")
+        return Response({'error': 'Database error'}, status=500)
+    except Exception as e:
+        logger.error(f"Error in get_user_areas: {str(e)}")
+        return Response({'error': 'Failed to get user areas'}, status=500)
+
+
 @api_view(['POST'])
 def update_area(request):
     """

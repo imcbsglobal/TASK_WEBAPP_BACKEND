@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     shop_location, get_firms, get_table_data, update_location_status,
     get_upload_signature, punchin, punchout, get_active_punchin,punchin_table,
-    get_areas, update_area
+    get_areas, update_area, get_user_areas
 )
 
 urlpatterns = [    
@@ -21,6 +21,7 @@ urlpatterns = [
 
     #Area management
     path("get-areas/", get_areas, name="get-areas"),
+    path("get-user-area", get_user_areas, name="get_user_area"),
     path("update-area/", update_area, name="update-area"),
 
 ]
