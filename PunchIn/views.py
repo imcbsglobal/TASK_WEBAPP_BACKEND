@@ -114,6 +114,67 @@ def shop_location(request):
         return Response({'error': 'An unexpected error occurred'}, status=500)
 
 
+# @api_view(['GET'])
+# def get_firms(request):
+#     """Get all firms with their latest shop location coordinates"""
+#     try:
+#         payload = decode_jwt_token(request)
+#         if not payload:
+#             return Response({'error': 'Invalid or missing token'}, status=401)
+#         username = payload.get('username')
+#         client_id = payload.get('client_id')
+#         role = payload.get('role')
+
+#         if not client_id:
+#             return Response({'error': 'Invalid or missing token'}, status=401)
+
+#         # Prepare subquery for latest shop location
+#         latest_shop = ShopLocation.objects.filter(
+#             firm=OuterRef('pk'),
+#             client_id=client_id
+#         ).order_by('-created_at')
+
+#         if role== "Admin":
+#             firms = AccMaster.objects.filter(client_id=client_id).annotate(
+#                 latitude=Subquery(latest_shop.values('latitude')[:1]),
+#                 longitude=Subquery(latest_shop.values('longitude')[:1]),
+#             )
+#         else :
+#             userAreas = UserAreas.objects.filter(client_id = client_id , user = username).values_list('area_code',flat=True)
+#             print("U areas : ",userAreas)
+#             firms = AccMaster.objects.filter(client_id = client_id ,area__in =userAreas,LIKE  ).annotate(
+#                 latitude=Subquery(latest_shop.values('latitude')[:1]),
+#                 longitude=Subquery(latest_shop.values('longitude')[:1]),
+#             )
+            
+            
+
+#         # Fetch firms with latest location
+
+
+#         if not firms.exists():
+#             return Response({'success': True, 'firms': [], 'message': 'No firms found'}, status=200)
+
+#         # Build response data
+#         data = [
+#             {
+#                 'id': firm.code,
+#                 'firm_name': firm.name,
+#                 'latitude': float(firm.latitude) if firm.latitude is not None else None,
+#                 'area':firm.area,
+#                 'longitude': float(firm.longitude) if firm.longitude is not None else None,
+#             }
+#             for firm in firms
+#         ]
+
+#         return Response({'success': True, 'firms': data}, status=200)
+
+#     except DatabaseError as e:
+#         logger.error(f"Database error in get_firms: {str(e)}")
+#         return Response({'error': 'Database error'}, status=500)
+#     except Exception as e:
+#         logger.exception("Unexpected error in get_firms")
+#         return Response({'error': 'An unexpected error occurred'}, status=500)
 @api_view(['GET'])
 def get_firms(request):
     """Get all firms with their latest shop location coordinates"""
@@ -122,7 +183,10 @@ def get_firms(request):
         if not payload:
             return Response({'error': 'Invalid or missing token'}, status=401)
 
+        username = payload.get('username')
         client_id = payload.get('client_id')
+        role = payload.get('role')
+
         if not client_id:
             return Response({'error': 'Invalid or missing token'}, status=401)
 
@@ -132,22 +196,51 @@ def get_firms(request):
             client_id=client_id
         ).order_by('-created_at')
 
-        # Fetch firms with latest location
-        firms = AccMaster.objects.filter(client_id=client_id).annotate(
-            latitude=Subquery(latest_shop.values('latitude')[:1]),
-            longitude=Subquery(latest_shop.values('longitude')[:1]),
-        )
+        # ---- ADMIN LOGIC ----
+        if role == "Admin":
+            firms = (
+                AccMaster.objects.filter(client_id=client_id)
+                .annotate(
+                    latitude=Subquery(latest_shop.values('latitude')[:1]),
+                    longitude=Subquery(latest_shop.values('longitude')[:1]),
+                )
+            )
 
+        # ---- NON-ADMIN LOGIC ----
+        else:
+            # Get areas assigned to this user
+            user_areas = UserAreas.objects.filter(
+                client_id=client_id,
+                user=username
+            ).values_list('area_code', flat=True)
+
+            from django.db.models import Q
+            area_filter = Q()
+
+            # Build LIKE filters: name__icontains or area__icontains
+            for area in user_areas:
+                area_filter |= Q(name__icontains=area) | Q(area__icontains=area)
+
+            # Apply dynamic filters
+            firms = (
+                AccMaster.objects.filter(client_id=client_id)
+                .filter(area_filter)
+                .annotate(
+                    latitude=Subquery(latest_shop.values('latitude')[:1]),
+                    longitude=Subquery(latest_shop.values('longitude')[:1]),
+                )
+            )
+
+        # ---- RESPONSE ----
         if not firms.exists():
             return Response({'success': True, 'firms': [], 'message': 'No firms found'}, status=200)
 
-        # Build response data
         data = [
             {
                 'id': firm.code,
                 'firm_name': firm.name,
+                'area': firm.area,
                 'latitude': float(firm.latitude) if firm.latitude is not None else None,
-                'area':firm.area,
                 'longitude': float(firm.longitude) if firm.longitude is not None else None,
             }
             for firm in firms
@@ -945,7 +1038,8 @@ def update_area(request):
                     new_areas.append(
                         UserAreas(
                             user=user,
-                            area_code=area_code.strip()
+                            area_code=area_code.strip(),
+                            client_id= client_id
                         )
                     )
             

@@ -96,6 +96,8 @@ class UserAreas(models.Model):
         on_delete=models.CASCADE,
         db_constraint=False,
         related_name="Areas" )
+    client_id = models.CharField(max_length=64, db_index=True)
+
     
     area_code =models.CharField(max_length=64,db_column="area_code")
 
