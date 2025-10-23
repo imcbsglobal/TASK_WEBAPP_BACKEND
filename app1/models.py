@@ -133,3 +133,6 @@ class CashAndBankAccMaster(models.Model):
         db_table = 'cashandbankaccmaster'
         managed = False  # Since the table already exists
         unique_together = ('code', 'client_id')
+
+
+
