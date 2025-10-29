@@ -184,9 +184,8 @@ def test_token(request):
 
 @api_view(['GET'])
 def get_debtors_data(request):
-    """Get joined data from AccMaster, AccLedgers, and AccInvmast tables for logged user's client_id with pagination and search - only super_code='DEBTO'"""
+    """Get debtors data (super_code='DEBTO') with calculated balance, pagination and search"""
     from django.db import connection
-    from django.core.paginator import Paginator
     import math
     
     try:
@@ -251,7 +250,7 @@ def get_debtors_data(request):
         # Calculate total pages
         total_pages = math.ceil(total_records / page_size) if total_records > 0 else 1
         
-        # Main query with search filter
+        # Main query with search filter and calculated balance
         main_query = f"""
             SELECT 
                 am.code,
@@ -259,6 +258,7 @@ def get_debtors_data(request):
                 am.opening_balance,
                 am.debit as master_debit,
                 am.credit as master_credit,
+                (COALESCE(am.debit, 0) - COALESCE(am.credit, 0)) as balance,
                 am.place,
                 am.phone2,
                 am.openingdepartment
@@ -280,6 +280,15 @@ def get_debtors_data(request):
             
             for row in cursor.fetchall():
                 row_data = dict(zip(columns, row))
+                # Convert Decimal to float for JSON serialization
+                if row_data.get('opening_balance'):
+                    row_data['opening_balance'] = float(row_data['opening_balance'])
+                if row_data.get('master_debit'):
+                    row_data['master_debit'] = float(row_data['master_debit'])
+                if row_data.get('master_credit'):
+                    row_data['master_credit'] = float(row_data['master_credit'])
+                if row_data.get('balance'):
+                    row_data['balance'] = float(row_data['balance'])
                 results.append(row_data)
         
         return Response({
@@ -298,6 +307,9 @@ def get_debtors_data(request):
         })
         
     except Exception as e:
+        import traceback
+        print(f"Error in get_debtors_data: {str(e)}")
+        print(traceback.format_exc())
         return Response({'success': False, 'error': str(e)}, status=500)
 
 @api_view(['GET'])
