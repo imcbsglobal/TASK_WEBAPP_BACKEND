@@ -10,7 +10,7 @@ from django.conf import settings
 
 @api_view(['GET'])
 def get_debtors_list(request):
-    """Return all debtors with Balance > 0 (Balance = debit - credit)"""
+    """Return all debtors with Balance > 0 (Balance = debit - credit) and super_code='DEBTO'"""
     try:
         # Get token from Authorization header
         auth_header = request.META.get('HTTP_AUTHORIZATION')
@@ -26,9 +26,9 @@ def get_debtors_list(request):
         except jwt.InvalidTokenError:
             return Response({'success': False, 'error': 'Invalid token'}, status=401)
 
-        # Get all accounts where Balance > 0
+        # Get all accounts where super_code='DEBTO' and Balance > 0
         debtors = (
-            AccMaster.objects.filter(client_id=client_id)
+            AccMaster.objects.filter(client_id=client_id, super_code='DEBTO')
             .values('code', 'name', 'place', 'phone2', 'debit', 'credit')
         )
 

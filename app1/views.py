@@ -184,7 +184,7 @@ def test_token(request):
 
 @api_view(['GET'])
 def get_debtors_data(request):
-    """Get joined data from AccMaster, AccLedgers, and AccInvmast tables for logged user's client_id with pagination and search"""
+    """Get joined data from AccMaster, AccLedgers, and AccInvmast tables for logged user's client_id with pagination and search - only super_code='DEBTO'"""
     from django.db import connection
     from django.core.paginator import Paginator
     import math
@@ -240,6 +240,7 @@ def get_debtors_data(request):
             SELECT COUNT(DISTINCT am.code)
             FROM acc_master am
             WHERE am.client_id = %s
+            AND am.super_code = 'DEBTO'
             {search_condition}
         """
         
@@ -263,6 +264,7 @@ def get_debtors_data(request):
                 am.openingdepartment
             FROM acc_master am
             WHERE am.client_id = %s
+            AND am.super_code = 'DEBTO'
             {search_condition}
             ORDER BY am.code
             LIMIT %s OFFSET %s
