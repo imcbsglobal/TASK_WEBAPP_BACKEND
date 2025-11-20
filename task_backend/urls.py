@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/suppiers_api/', include('suppiers_api.urls')),
     path('api/', include('salestoday_purchasetoday.urls')),
     path('api/sales-return/', include('SalesReturnReport.urls')),  # Add this line
+    path('api/', include('users_list_api.urls')),
 
     
 ]
