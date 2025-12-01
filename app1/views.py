@@ -47,6 +47,7 @@ def login(request):
     "cash-book",
     "bank-book",
     "debtors",
+    "statement",
     "company",
     "punch-in",
     "location-capture",
