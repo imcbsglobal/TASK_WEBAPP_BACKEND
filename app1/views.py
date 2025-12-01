@@ -54,7 +54,9 @@ def login(request):
     "area-assign",
     "master",
     "user-menu",
-    "settings"
+    "settings",
+    "users",
+    "suppliers"
     ]
     else :    
         try:
