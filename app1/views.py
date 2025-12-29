@@ -35,27 +35,21 @@ def login(request):
     # Menu permissions configuration
     if role == "Admin":
         allowedMenuIds = [
-            "item-details",
             "bank-cash",
             "cash-book",
             "bank-book",
-            "inventory",         # ✅ Inventory parent menu
-            "purchase-report",   # ✅ Purchase Report submenu
-            "sale-report",       # ✅ Sale Report submenu
-            "sale-return",       # ✅ Sale Return submenu
-            "debtors",
+            "inventory",           # Inventory parent menu
+            "purchase-report",     # Purchase Report submenu
+            "sale-report",         # Sale Report submenu
+            "sale-return",         # Sale Return submenu
             "statement",
-            "company",
-            "punch-in",
-            "location-capture",
-            "punch-in-action",
-            "area-assign",
+            "debtors",
             "master",
             "suppliers",
             "users",
             "user-menu",
             "setting-menu",
-            "settings"
+            "company"
         ]
     else:    
         try:
