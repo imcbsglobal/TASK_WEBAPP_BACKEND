@@ -27,6 +27,13 @@ urlpatterns = [
     path('api/', include('salestoday_purchasetoday.urls')),
     path('api/sales-return/', include('SalesReturnReport.urls')),  # Add this line
     path('api/', include('users_list_api.urls')),
+    path('api/', include('acc_sales_type.urls')),
+    path('api/', include('eventlog.urls')),
+    path('api/', include('pdc.urls')),
+    path('api/', include('refresh_tag.urls')),
+    path('api/', include('stock_report.urls')),
+    path('api/', include('tendercash.urls')),
+    path('api/', include('type_wise_salestoday.urls')),
 
     
 ]
