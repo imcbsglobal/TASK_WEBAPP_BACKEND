@@ -1,14 +1,12 @@
-# views.py - With debugging
+# views.py - Complete with Inventory Menu Support
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import AccUser, Misel
 from datetime import datetime, timedelta
 import jwt
 from django.conf import settings
-from .models import AccUser, Misel, AccMaster, AccLedgers, AccInvmast,CashAndBankAccMaster
+from .models import AccUser, Misel, AccMaster, AccLedgers, AccInvmast, CashAndBankAccMaster
 from accesscontroll.models import AllowedMenu
-
-
 
 
 @api_view(['POST'])
@@ -29,58 +27,49 @@ def login(request):
     except AccUser.MultipleObjectsReturned:
         return Response({'success': False, 'error': 'Multiple users found with these credentials'}, status=401)
 
-    # Remove the redundant client_id check since it's now part of the query
-    # if client_id != user.client_id:
-    #     return Response({'success': False, 'error': 'Invalid client ID'}, status=401)
-
     if account_code and account_code != user.accountcode:
         return Response({'success': False, 'error': 'Invalid account code'}, status=401)
     
     role = "Admin" if (user.role and user.role.strip().lower() == "level 3") else "User"
 
-
-# replace this with menuconfig function
+    # Menu permissions configuration
     if role == "Admin":
-       allowedMenuIds= [
-     "item-details",
-    "bank-cash",
-    "cash-book",
-    "bank-book",
-    "debtors",
-    "statement",
-    "company",
-    "punch-in",
-    "location-capture",
-    "punch-in-action",
-    "area-assign",
-    "master",
-    "user-menu",
-    "settings",
-    "users",
-    "suppliers"
-    ]
-    else :    
+        allowedMenuIds = [
+            "bank-cash",
+            "cash-book",
+            "bank-book",
+            "inventory",           # Inventory parent menu
+            "purchase-report",     # Purchase Report submenu
+            "sale-report",         # Sale Report submenu
+            "sale-return",         # Sale Return submenu
+            "statement",
+            "debtors",
+            "master",
+            "suppliers",
+            "users",
+            "user-menu",
+            "setting-menu",
+            "company"
+        ]
+    else:    
         try:
-        # Fetch allowed menu IDs for the user
+            # Fetch allowed menu IDs for the user
             allowedMenuIds = AllowedMenu.objects.filter(
-            user_id=user.id, client_id=client_id
-            ).values_list('allowedMenuIds',flat=True).first()
+                user_id=user.id, client_id=client_id
+            ).values_list('allowedMenuIds', flat=True).first()
 
-
-        # If no allowed menus found, default to ['company']
+            # If no allowed menus found, default to ['company']
             if not allowedMenuIds:
                 allowedMenuIds = ['company']
 
         except AllowedMenu.DoesNotExist:
-        # This usually won't trigger with filter(), but included for safety
+            # This usually won't trigger with filter(), but included for safety
             allowedMenuIds = ['company']
 
         except Exception as e:
-        # Log the error in production
+            # Log the error in production
             print(f"Error fetching AllowedMenuIds: {e}")
             return Response({'success': False, "error": "Error fetching AllowedMenuIds"}, status=500)
-
-     
 
     # Create custom JWT token with user data
     payload = {
@@ -103,16 +92,17 @@ def login(request):
             'client_id': user.client_id,
             'accountcode': user.accountcode,
             'login_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'allowedMenuIds':allowedMenuIds
-
+            'allowedMenuIds': allowedMenuIds
         },
         'token': token,
     })
+
 
 @api_view(['GET'])
 def get_users(request):
     qs = AccUser.objects.all().values('id', 'role', 'accountcode', 'client_id')
     return Response({'users': list(qs)})
+
 
 @api_view(['GET'])
 def get_misel_data(request):
@@ -165,7 +155,6 @@ def get_misel_data(request):
     except Exception as e:
         print(f"=== DEBUG: Exception: {str(e)} ===")
         return Response({'success': False, 'error': str(e)}, status=500)
-    
 
 
 @api_view(['GET'])
@@ -178,11 +167,6 @@ def test_token(request):
         'all_headers': {k: v for k, v in request.META.items() if 'HTTP_' in k},
         'method': request.method,
     })
-
-
-
-
-
 
 
 @api_view(['GET'])
@@ -315,6 +299,7 @@ def get_debtors_data(request):
         print(traceback.format_exc())
         return Response({'success': False, 'error': str(e)}, status=500)
 
+
 @api_view(['GET'])
 def get_ledger_details(request):
     """Get detailed ledger entries for a specific account"""
@@ -409,10 +394,6 @@ def get_invoice_details(request):
         
     except Exception as e:
         return Response({'success': False, 'error': str(e)}, status=500)
-    
-
-
-
 
 
 @api_view(['GET'])
@@ -547,11 +528,6 @@ def get_bank_book_data(request):
         
     except Exception as e:
         return Response({'success': False, 'error': str(e)}, status=500)
-    
-
-
-
-
 
 
 @api_view(['GET'])
