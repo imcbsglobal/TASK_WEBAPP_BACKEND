@@ -187,6 +187,45 @@ def get_sales_monthwise(request):
         'data': serializer.data,
     })
 
+@api_view(['GET'])
+def get_purchase_month(request):
+    client_id, err = _decode_token_get_client_id(request)
+    if err:
+        return err
+
+    today = _current_date_in_kolkata()
+
+    qs = PurchaseToday.objects.filter(
+        client_id=client_id,
+        date__year=today.year,
+        date__month=today.month
+    ).order_by('-date', '-id')
+
+    serializer = PurchaseTodaySerializer(qs, many=True)
+    return Response({
+        'success': True,
+        'data': serializer.data
+    })
+
+
+@api_view(['GET'])
+def get_purchase_overall(request):
+    client_id, err = _decode_token_get_client_id(request)
+    if err:
+        return err
+
+    qs = PurchaseToday.objects.filter(
+        client_id=client_id
+    ).order_by('-date', '-id')
+
+    serializer = PurchaseTodaySerializer(qs, many=True)
+    return Response({
+        'success': True,
+        'data': serializer.data
+    })
+
+
+
 
 
 

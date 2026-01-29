@@ -71,4 +71,4 @@ def suppliers_list(request):
         'count': suppliers.count(),
         'data': list(suppliers)
     })
-# h
+       
