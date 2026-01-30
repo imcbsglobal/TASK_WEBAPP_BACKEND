@@ -402,53 +402,63 @@ def get_cash_book_data(request):
     try:
         # Get token from Authorization header
         auth_header = request.META.get('HTTP_AUTHORIZATION')
-        
+
         if not auth_header or not auth_header.startswith('Bearer '):
             return Response({'success': False, 'error': 'Missing or invalid authorization header'}, status=401)
-        
+
         token = auth_header.split(' ')[1]
-        
+
         try:
-            # Decode the JWT token
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
             client_id = payload.get('client_id')
-            
+
             if not client_id:
                 return Response({'success': False, 'error': 'Invalid token: missing client_id'}, status=401)
-                
+
         except jwt.ExpiredSignatureError:
             return Response({'success': False, 'error': 'Token has expired'}, status=401)
         except jwt.InvalidTokenError as e:
             return Response({'success': False, 'error': f'Invalid token: {str(e)}'}, status=401)
-        
-        # Get pagination parameters
+
+        # Pagination
         page = int(request.GET.get('page', 1))
         page_size = int(request.GET.get('page_size', 20))
-        
-        # Calculate offset
         offset = (page - 1) * page_size
-        
-        # Get cash accounts (super_code='CASH')
-        cash_accounts = CashAndBankAccMaster.objects.filter(
+
+        # 🔥 FETCH CASH ACCOUNTS (REMOVED opening_balance & opening_date)
+        cash_qs = CashAndBankAccMaster.objects.filter(
             client_id=client_id,
             super_code='CASH'
         ).values(
-            'code', 'name', 'opening_balance', 'opening_date',
-            'debit', 'credit'
+            'code', 'name', 'debit', 'credit'
         ).order_by('code')[offset:offset + page_size]
-        
-        # Get total count for pagination
+
+        # ✅ CALCULATE BALANCE
+        cash_accounts = []
+        for acc in cash_qs:
+            debit = acc.get('debit') or 0
+            credit = acc.get('credit') or 0
+
+            cash_accounts.append({
+                "code": acc.get("code"),
+                "name": acc.get("name"),
+                "debit": float(debit),
+                "credit": float(credit),
+                "balance": float(debit - credit)   # ✅ NEW COLUMN
+            })
+
+        # Pagination count
         total_records = CashAndBankAccMaster.objects.filter(
             client_id=client_id,
             super_code='CASH'
         ).count()
-        
+
         import math
         total_pages = math.ceil(total_records / page_size)
-        
+
         return Response({
-            'success': True, 
-            'data': list(cash_accounts),
+            'success': True,
+            'data': cash_accounts,
             'pagination': {
                 'current_page': page,
                 'total_pages': total_pages,
@@ -458,7 +468,7 @@ def get_cash_book_data(request):
                 'has_previous': page > 1
             }
         })
-        
+
     except Exception as e:
         return Response({'success': False, 'error': str(e)}, status=500)
 
@@ -469,53 +479,63 @@ def get_bank_book_data(request):
     try:
         # Get token from Authorization header
         auth_header = request.META.get('HTTP_AUTHORIZATION')
-        
+
         if not auth_header or not auth_header.startswith('Bearer '):
             return Response({'success': False, 'error': 'Missing or invalid authorization header'}, status=401)
-        
+
         token = auth_header.split(' ')[1]
-        
+
         try:
-            # Decode the JWT token
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
             client_id = payload.get('client_id')
-            
+
             if not client_id:
                 return Response({'success': False, 'error': 'Invalid token: missing client_id'}, status=401)
-                
+
         except jwt.ExpiredSignatureError:
             return Response({'success': False, 'error': 'Token has expired'}, status=401)
         except jwt.InvalidTokenError as e:
             return Response({'success': False, 'error': f'Invalid token: {str(e)}'}, status=401)
-        
-        # Get pagination parameters
+
+        # Pagination
         page = int(request.GET.get('page', 1))
         page_size = int(request.GET.get('page_size', 20))
-        
-        # Calculate offset
         offset = (page - 1) * page_size
-        
-        # Get bank accounts (super_code='BANK')
-        bank_accounts = CashAndBankAccMaster.objects.filter(
+
+        # 🔥 FETCH BANK ACCOUNTS (REMOVED opening_balance & opening_date)
+        bank_qs = CashAndBankAccMaster.objects.filter(
             client_id=client_id,
             super_code='BANK'
         ).values(
-            'code', 'name', 'opening_balance', 'opening_date',
-            'debit', 'credit'
+            'code', 'name', 'debit', 'credit'
         ).order_by('code')[offset:offset + page_size]
-        
-        # Get total count for pagination
+
+        # ✅ CALCULATE BALANCE
+        bank_accounts = []
+        for acc in bank_qs:
+            debit = acc.get('debit') or 0
+            credit = acc.get('credit') or 0
+
+            bank_accounts.append({
+                "code": acc.get("code"),
+                "name": acc.get("name"),
+                "debit": float(debit),
+                "credit": float(credit),
+                "balance": float(debit - credit)   # ✅ NEW COLUMN
+            })
+
+        # Pagination count
         total_records = CashAndBankAccMaster.objects.filter(
             client_id=client_id,
             super_code='BANK'
         ).count()
-        
+
         import math
         total_pages = math.ceil(total_records / page_size)
-        
+
         return Response({
-            'success': True, 
-            'data': list(bank_accounts),
+            'success': True,
+            'data': bank_accounts,
             'pagination': {
                 'current_page': page,
                 'total_pages': total_pages,
@@ -525,7 +545,7 @@ def get_bank_book_data(request):
                 'has_previous': page > 1
             }
         })
-        
+
     except Exception as e:
         return Response({'success': False, 'error': str(e)}, status=500)
 

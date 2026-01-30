@@ -1,4 +1,3 @@
-
 from pathlib import Path
 from decouple import config
 # import cloudinary
@@ -26,13 +25,31 @@ SECRET_KEY = 'django-insecure-%czi_^6texrx)h7@d#x58rp7s#(jl*#idtou14ol%-_%z=)bm4
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['taskprime.app','127.0.0.1']
+ALLOWED_HOSTS = ['taskprime.app', 'www.taskprime.app', '127.0.0.1', 'localhost']
 
 
-CORS_ALLOW_HEADERS = ['*']
-CORS_ALLOW_METHODS = ['*']
-CORS_ALLOW_CREDENTIALS = True
+# CORS Configuration - UPDATED
 CORS_ALLOW_ALL_ORIGINS = True  # For development only
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
 # Application definition
 
@@ -43,16 +60,16 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',  # MOVED TO TOP - IMPORTANT!
     'rest_framework',
     'app1',
     'PunchIn',
-    'corsheaders',
     'cloudinary',
     'DebtorsAPI',
     'suppiers_api',
     'accesscontroll',
     'salestoday_purchasetoday',
-    'SalesReturnReport',  # Add this line
+    'SalesReturnReport',
     'users_list_api',
     'acc_sales_type',
     'eventlog',
@@ -63,11 +80,6 @@ INSTALLED_APPS = [
     'type_wise_salestoday',
 ]
 
-# Add at the bottom
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "https://taskprime.app",  
-]
 from datetime import timedelta
 
 SIMPLE_JWT = {
@@ -83,7 +95,7 @@ REST_FRAMEWORK = {
 }
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # MUST BE FIRST!
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
