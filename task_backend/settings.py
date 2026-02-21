@@ -64,7 +64,7 @@ INSTALLED_APPS = [
     
 ]
 
-# Add at the bottom
+## Add at the bottom
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://taskprime.app",  
