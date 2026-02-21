@@ -60,7 +60,8 @@ INSTALLED_APPS = [
     'refresh_tag',
     'stock_report',
     'tendercash',
-    'type_wise_salestoday',
+    'type_wise_sales_today',
+    
 ]
 
 # Add at the bottom
