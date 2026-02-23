@@ -99,12 +99,15 @@ class AccInvmast(models.Model):
     Connected via 'customerid' field to AccMaster.code
     """
     id = models.AutoField(primary_key=True)
+    slno = models.BigIntegerField(blank=True, null=True)  # ✅ NEW
     modeofpayment = models.CharField(max_length=10, blank=True, null=True)
     customerid = models.CharField(max_length=30, blank=True, null=True)  # Links to AccMaster.code
     invdate = models.DateField(blank=True, null=True)#
     nettotal = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)#
     paid = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)#
     bill_ref = models.CharField(max_length=100, blank=True, null=True)
+    userid = models.CharField(max_length=50, blank=True, null=True)
+    type = models.CharField(max_length=20, blank=True, null=True)
     client_id = models.CharField(max_length=100)
 
     class Meta:

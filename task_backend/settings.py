@@ -61,6 +61,8 @@ INSTALLED_APPS = [
     'stock_report',
     'tendercash',
     'type_wise_sales_today',
+    'tender_cash_byuser',
+    'tender_cash_bytype',
     
 ]
 
