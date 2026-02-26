@@ -18,10 +18,7 @@ def tender_cash_by_user(request):
         # 🔐 JWT validation
         auth_header = request.META.get('HTTP_AUTHORIZATION')
         if not auth_header or not auth_header.startswith('Bearer '):
-            return Response(
-                {'success': False, 'error': 'Missing or invalid authorization header'},
-                status=401
-            )
+            return Response({'success': False, 'error': 'Unauthorized'}, status=401)
 
         token = auth_header.split(' ')[1]
 
@@ -32,19 +29,16 @@ def tender_cash_by_user(request):
         except jwt.InvalidTokenError:
             return Response({'success': False, 'error': 'Invalid token'}, status=401)
 
-        # ✅ ONLY client_id from token
         client_id = payload.get('client_id')
         if not client_id:
-            return Response(
-                {'success': False, 'error': 'Invalid token payload'},
-                status=401
-            )
+            return Response({'success': False, 'error': 'Invalid token'}, status=401)
 
-        # ✅ Database is source of truth
+        # ✅ NO JOIN – currency_name from tendercash
         query = """
             SELECT
                 tender_code,
-                amount
+                amount,
+                currency_name
             FROM tendercash
             WHERE client_id = %s
             ORDER BY tender_code
@@ -57,26 +51,24 @@ def tender_cash_by_user(request):
         items = []
         total = 0.0
 
-        for code, amount in rows:
+        for code, amount, currency_name in rows:
             amount = float(amount)
+            total += amount
             items.append({
                 "code": code,
-                "amount": amount
+                "amount": amount,
+                "currency_name": currency_name
             })
-            total += amount
 
         return Response({
             "success": True,
             "client_id": client_id,
             "data": {
-                "user": None,          # 👈 explicitly NULL
+                "user": None,
                 "total": total,
                 "items": items
             }
         })
 
     except Exception as e:
-        return Response(
-            {'success': False, 'error': str(e)},
-            status=500
-        )
+        return Response({'success': False, 'error': str(e)}, status=500)
