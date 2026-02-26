@@ -10,7 +10,7 @@ try:
     from zoneinfo import ZoneInfo
 except Exception:
     # Fallback to pytz if zoneinfo is not available
-    from pytz import timezone as ZoneInfo  # type: ignore
+    from pytz import timezone as ZoneInfo  # type: ignoree
 
 def _decode_token_get_client_id(request):
     """
@@ -140,15 +140,11 @@ def get_sales_daywise(request):
         'data': serializer.data,
     })
 
-
 @api_view(['GET'])
 def get_sales_monthwise(request):
     client_id, err = _decode_token_get_client_id(request)
     if err:
         return err
-
-    # Get current year
-    current_year = _current_date_in_kolkata().year
 
     year_param = request.GET.get('year')
 
@@ -156,16 +152,14 @@ def get_sales_monthwise(request):
 
     if year_param and year_param != 'all':
         qs = qs.filter(year=year_param)
-    else:
-        qs = qs.filter(year=current_year)
 
-    qs = qs.order_by('month_number')
+    qs = qs.order_by('year', 'month_number')
 
     serializer = SalesMonthwiseSerializer(qs, many=True)
 
     return Response({
         'success': True,
-        'year': year_param if year_param else current_year,
+        'year': year_param if year_param else 'all',
         'total_records': qs.count(),
         'data': serializer.data,
     })
