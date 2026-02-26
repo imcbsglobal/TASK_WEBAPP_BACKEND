@@ -1,32 +1,46 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import AccMaster  # we'll import the existing model location below
-# If your AccMaster model is in project app.models (as in your uploaded models.py),
-# adjust import path accordingly:
-# from your_app.models import AccMaster
+from django.conf import settings
+import jwt
 
-# If AccMaster is in the root app's models.py (based on your upload), use:
-# from <your_root_app_name>.models import AccMaster
-# Replace <your_root_app_name> with the app name where models.py lives.
+from .models import AccMaster
+
 
 @api_view(['GET'])
 def suppliers_list(request):
-    """
-    Returns list of suppliers from acc_master where super_code = 'SUNCR'.
-    Fields returned: code,name,opening_balance,debit,credit,place,phone2,
-                    openingdepartment,area,client_id,super_code
-    Optional query param:
-      - client_id (string): if provided, will filter by client_id as well.
-    """
     try:
-        client_id = request.GET.get('client_id', None)
+        # 1️⃣ Get Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
 
-        qs = AccMaster.objects.filter(super_code='SUNCR')
-        if client_id:
-            qs = qs.filter(client_id=client_id)
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return Response(
+                {'success': False, 'error': 'Missing or invalid authorization header'},
+                status=401
+            )
 
-        # return only requested fields
-        data = qs.values(
+        token = auth_header.split(' ')[1]
+
+        # 2️⃣ Decode JWT token
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            client_id = payload.get('client_id')
+
+            if not client_id:
+                return Response(
+                    {'success': False, 'error': 'Invalid token: client_id missing'},
+                    status=401
+                )
+
+        except jwt.ExpiredSignatureError:
+            return Response({'success': False, 'error': 'Token expired'}, status=401)
+        except jwt.InvalidTokenError:
+            return Response({'success': False, 'error': 'Invalid token'}, status=401)
+
+        # 3️⃣ Fetch suppliers ONLY for logged-in client
+        suppliers = AccMaster.objects.filter(
+            super_code='SUNCR',
+            client_id=client_id
+        ).values(
             'code',
             'name',
             'opening_balance',
@@ -40,6 +54,7 @@ def suppliers_list(request):
             'super_code'
         ).order_by('code')
 
-        return Response({'success': True, 'data': list(data)})
+        return Response({'success': True, 'data': list(suppliers)})
+
     except Exception as e:
         return Response({'success': False, 'error': str(e)}, status=500)
