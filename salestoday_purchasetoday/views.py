@@ -143,30 +143,6 @@ def get_sales_daywise(request):
 
 @api_view(['GET'])
 def get_sales_monthwise(request):
-    """
-    Returns SalesMonthwise records for the requesting client's client_id.
-    Returns current year's monthly sales summary.
-
-    Auth: Authorization: Bearer <jwt>  (token must contain client_id)
-    
-    Response format:
-    {
-        "success": true,
-        "total_records": 11,
-        "data": [
-            {
-                "id": 1,
-                "month_name": "January 2025",
-                "month_number": 1,
-                "year": 2025,
-                "total_bills": 3500,
-                "total_amount": "2500000.000",
-                "client_id": "CLIENT001"
-            },
-            ...
-        ]
-    }
-    """
     client_id, err = _decode_token_get_client_id(request)
     if err:
         return err
@@ -174,15 +150,22 @@ def get_sales_monthwise(request):
     # Get current year
     current_year = _current_date_in_kolkata().year
 
-    qs = SalesMonthwise.objects.filter(
-        client_id=client_id, 
-        year=current_year
-    ).order_by('month_number')
+    year_param = request.GET.get('year')
+
+    qs = SalesMonthwise.objects.filter(client_id=client_id)
+
+    if year_param and year_param != 'all':
+        qs = qs.filter(year=year_param)
+    else:
+        qs = qs.filter(year=current_year)
+
+    qs = qs.order_by('month_number')
 
     serializer = SalesMonthwiseSerializer(qs, many=True)
+
     return Response({
         'success': True,
-        'year': current_year,
+        'year': year_param if year_param else current_year,
         'total_records': qs.count(),
         'data': serializer.data,
     })
