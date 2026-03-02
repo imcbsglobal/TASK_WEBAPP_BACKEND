@@ -1,9 +1,16 @@
 from datetime import date
-from django.db.models import Sum, Count, OuterRef, Subquery, F
+
+from django.conf import settings
+from django.db.models import (
+    Sum, Count, OuterRef, Subquery, F,
+    Value, DecimalField
+)
+from django.db.models.functions import Coalesce
+
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+
 import jwt
-from django.conf import settings
 
 from app1.models import AccInvmast
 from acc_sales_type.models import AccSalesType
@@ -11,21 +18,6 @@ from acc_sales_type.models import AccSalesType
 
 @api_view(["GET"])
 def type_wise_sales_today(request):
-    """
-    API: Type Wise Sales Today (Token Protected)
-
-    Token: REQUIRED
-    Client Scope: Logged-in client_id only
-
-    Join Condition:
-      acc_invmast.modeofpayment = acc_sales_types.cd
-
-    Response Fields:
-      1. type
-      2. nettotal
-      3. billcount
-      4. name
-    """
 
     # ==========================
     # 🔐 TOKEN VALIDATION
@@ -52,7 +44,6 @@ def type_wise_sales_today(request):
 
     except jwt.ExpiredSignatureError:
         return Response({"success": False, "error": "Token expired"}, status=401)
-
     except jwt.InvalidTokenError:
         return Response({"success": False, "error": "Invalid token"}, status=401)
 
@@ -61,7 +52,6 @@ def type_wise_sales_today(request):
     # ==========================
     today = date.today()
 
-    # Subquery to fetch sales type name
     sales_type_name = AccSalesType.objects.filter(
         cd=OuterRef("modeofpayment"),
         client_id=client_id
@@ -71,15 +61,20 @@ def type_wise_sales_today(request):
         AccInvmast.objects
         .filter(
             invdate=today,
-            client_id=client_id
+            client_id=client_id,
+            modeofpayment__isnull=False
         )
-        .values(type=F("modeofpayment"))
+        .values(payment_type=F("modeofpayment"))
         .annotate(
-            nettotal=Sum("nettotal"),
+            nettotal=Coalesce(
+                Sum("nettotal"),
+                Value(0),
+                output_field=DecimalField(max_digits=15, decimal_places=2)
+            ),
             billcount=Count("id"),
-            name=Subquery(sales_type_name)
+            name=Coalesce(Subquery(sales_type_name), Value("Unknown"))
         )
-        .order_by("type")
+        .order_by("payment_type")
     )
 
     return Response({
