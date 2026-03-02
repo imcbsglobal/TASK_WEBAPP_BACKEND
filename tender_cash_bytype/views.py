@@ -16,7 +16,6 @@ from django.db import connection
 import jwt
 from django.conf import settings
 
-
 @api_view(['GET'])
 def tender_cash_bytype(request):
     try:
@@ -40,48 +39,47 @@ def tender_cash_bytype(request):
 
         query = """
             SELECT
-                i.type,
+                COALESCE(i.type, 'UNKNOWN') AS type,
                 t.tender_code,
-                t.amount,
-                t.currency_name
+                t.currency_name,
+                SUM(t.amount) AS total_amount
             FROM tendercash t
             LEFT JOIN acc_invmast i
                 ON t.mslno = i.slno
                AND t.client_id = i.client_id
             WHERE t.client_id = %s
-            ORDER BY i.type NULLS LAST
+            GROUP BY COALESCE(i.type, 'UNKNOWN'), t.tender_code, t.currency_name
+            ORDER BY COALESCE(i.type, 'UNKNOWN'), t.tender_code
         """
 
         with connection.cursor() as cursor:
             cursor.execute(query, [client_id])
             rows = cursor.fetchall()
 
-        grouped = defaultdict(lambda: {"total": 0.0, "items": []})
+        grouped = {}
 
-        for typ, code, amount, currency_name in rows:
-            typ = typ or "UNKNOWN"
-            amount = float(amount)
+        for typ, code, currency_name, total_amount in rows:
+            total_amount = float(total_amount)
+
+            if typ not in grouped:
+                grouped[typ] = {
+                    "type": typ,
+                    "total": 0.0,
+                    "items": []
+                }
 
             grouped[typ]["items"].append({
                 "code": code,
-                "amount": amount,
-                "currency_name": currency_name
+                "currency_name": currency_name,
+                "total_amount": total_amount
             })
 
-            grouped[typ]["total"] += amount
-
-        data = []
-        for typ, info in grouped.items():
-            data.append({
-                "type": typ,
-                "total": info["total"],
-                "items": info["items"]
-            })
+            grouped[typ]["total"] += total_amount
 
         return Response({
             "success": True,
             "client_id": client_id,
-            "data": data
+            "data": list(grouped.values())
         })
 
     except Exception as e:

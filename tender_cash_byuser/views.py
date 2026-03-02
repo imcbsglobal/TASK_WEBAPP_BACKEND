@@ -11,7 +11,6 @@ from django.db import connection
 import jwt
 from django.conf import settings
 
-
 @api_view(['GET'])
 def tender_cash_by_user(request):
     try:
@@ -33,14 +32,15 @@ def tender_cash_by_user(request):
         if not client_id:
             return Response({'success': False, 'error': 'Invalid token'}, status=401)
 
-        # ✅ NO JOIN – currency_name from tendercash
+        # ✅ GROUP BY code – full amount per code
         query = """
             SELECT
                 tender_code,
-                amount,
-                currency_name
+                currency_name,
+                SUM(amount) AS total_amount
             FROM tendercash
             WHERE client_id = %s
+            GROUP BY tender_code, currency_name
             ORDER BY tender_code
         """
 
@@ -49,23 +49,23 @@ def tender_cash_by_user(request):
             rows = cursor.fetchall()
 
         items = []
-        total = 0.0
+        grand_total = 0.0
 
-        for code, amount, currency_name in rows:
-            amount = float(amount)
-            total += amount
+        for code, currency_name, total_amount in rows:
+            total_amount = float(total_amount)
+            grand_total += total_amount
+
             items.append({
                 "code": code,
-                "amount": amount,
-                "currency_name": currency_name
+                "currency_name": currency_name,
+                "total_amount": total_amount
             })
 
         return Response({
             "success": True,
             "client_id": client_id,
             "data": {
-                "user": None,
-                "total": total,
+                "grand_total": grand_total,
                 "items": items
             }
         })
