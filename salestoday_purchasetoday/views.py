@@ -250,3 +250,7 @@ def get_sales_monthwise(request):
    curl -X GET "http://your-domain/api/salesmonthwise/" \
         -H "Authorization: Bearer YOUR_JWT_TOKEN"
 """
+
+
+
+# jnk
