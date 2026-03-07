@@ -4,12 +4,12 @@ from django.db import connection
 import jwt
 from django.conf import settings
 
-
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db import connection
 import jwt
 from django.conf import settings
+
 
 @api_view(['GET'])
 def tender_cash_by_user(request):
@@ -29,46 +29,53 @@ def tender_cash_by_user(request):
             return Response({'success': False, 'error': 'Invalid token'}, status=401)
 
         client_id = payload.get('client_id')
-        if not client_id:
-            return Response({'success': False, 'error': 'Invalid token'}, status=401)
 
-        # ✅ GROUP BY code – full amount per code
         query = """
             SELECT
-                tender_code,
-                currency_name,
-                SUM(amount) AS total_amount
-            FROM tendercash
-            WHERE client_id = %s
-            GROUP BY tender_code, currency_name
-            ORDER BY tender_code
+                s.userid,
+                t.tender_code,
+                t.currency_name,
+                SUM(t.amount) AS total_amount
+            FROM tendercash t
+            JOIN sales_today s
+            ON s.slno = t.mslno
+            WHERE t.client_id = %s
+            GROUP BY s.userid, t.tender_code, t.currency_name
+            ORDER BY s.userid, t.tender_code
         """
 
         with connection.cursor() as cursor:
             cursor.execute(query, [client_id])
             rows = cursor.fetchall()
 
-        items = []
-        grand_total = 0.0
+        users = {}
+        grand_total = 0
 
-        for code, currency_name, total_amount in rows:
-            total_amount = float(total_amount)
-            grand_total += total_amount
+        for userid, code, name, amount in rows:
+            amount = float(amount)
+            grand_total += amount
 
-            items.append({
+            if userid not in users:
+                users[userid] = {
+                    "userid": userid,
+                    "tenders": [],
+                    "total": 0
+                }
+
+            users[userid]["tenders"].append({
                 "code": code,
-                "currency_name": currency_name,
-                "total_amount": total_amount
+                "currency_name": name,
+                "amount": amount
             })
+
+            users[userid]["total"] += amount
 
         return Response({
             "success": True,
             "client_id": client_id,
-            "data": {
-                "grand_total": grand_total,
-                "items": items
-            }
+            "grand_total": grand_total,
+            "users": list(users.values())
         })
 
     except Exception as e:
-        return Response({'success': False, 'error': str(e)}, status=500)
+        return Response({"success": False, "error": str(e)}, status=500)

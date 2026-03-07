@@ -50,29 +50,57 @@ def _current_date_in_kolkata():
             now = datetime.utcnow()
     return now.date()
 
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from django.db.models import Sum, Count
+
+
 @api_view(['GET'])
 def get_sales_today(request):
     """
-    Returns SalesToday records for the requesting client's client_id
-    where invdate == current date in Asia/Kolkata timezone.
-
-    Auth: Authorization: Bearer <jwt>  (token must contain client_id)
-    Query params are ignored for date filtering — API returns only today's data.
+    Returns USER wise sales summary for today
     """
+
     client_id, err = _decode_token_get_client_id(request)
     if err:
         return err
 
     today = _current_date_in_kolkata()
 
-    qs = SalesToday.objects.filter(client_id=client_id, invdate=today).order_by('-invdate', '-id')
+    qs = (
+        SalesToday.objects
+        .filter(client_id=client_id, invdate=today)
+        .values('userid')
+        .annotate(
+            total_amount=Sum('nettotal'),
+            bill_count=Count('id')
+        )
+        .order_by('userid')
+    )
 
-    serializer = SalesTodaySerializer(qs, many=True)
+    data = []
+
+    grand_total = 0
+    total_bills = 0
+
+    for row in qs:
+        amount = float(row['total_amount'] or 0)
+        grand_total += amount
+        total_bills += row['bill_count']
+
+        data.append({
+            "userid": row['userid'],
+            "total_amount": amount,
+            "bill_count": row['bill_count']
+        })
+
     return Response({
-        'success': True,
-        'date': today.isoformat(),
-        'total_records': qs.count(),
-        'data': serializer.data,
+        "success": True,
+        "date": today.isoformat(),
+        "total_users": len(data),
+        "total_bills": total_bills,
+        "grand_total": grand_total,
+        "data": data
     })
 
 
