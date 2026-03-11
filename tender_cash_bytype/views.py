@@ -1,26 +1,3 @@
-from django.shortcuts import render
-
-# Create your views here.
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from django.db import connection
-import jwt
-from django.conf import settings
-from collections import defaultdict
-
-
-from collections import defaultdict
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from django.db import connection
-import jwt
-from django.conf import settings
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from django.db import connection
-import jwt
-from django.conf import settings
-
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db import connection
@@ -51,9 +28,11 @@ def tender_cash_bytype(request):
         if not client_id:
             return Response({'success': False, 'error': 'Invalid token'}, status=401)
 
+        # ✅ SQL with Type Name Join
         query = """
             SELECT
                 s.type,
+                ast.name AS type_name,
                 t.tender_code,
                 t.currency_name,
                 SUM(t.amount) AS total_amount
@@ -61,8 +40,11 @@ def tender_cash_bytype(request):
             JOIN sales_today s
               ON s.slno = t.mslno
              AND s.client_id = t.client_id
+            LEFT JOIN acc_sales_types ast
+              ON ast.cd = s.type
+             AND ast.client_id = s.client_id
             WHERE t.client_id = %s
-            GROUP BY s.type, t.tender_code, t.currency_name
+            GROUP BY s.type, ast.name, t.tender_code, t.currency_name
             ORDER BY s.type, t.tender_code
         """
 
@@ -73,7 +55,7 @@ def tender_cash_bytype(request):
         grouped = {}
         grand_total = 0
 
-        for typ, code, name, amount in rows:
+        for typ, type_name, code, currency_name, amount in rows:
 
             amount = float(amount)
             grand_total += amount
@@ -81,13 +63,14 @@ def tender_cash_bytype(request):
             if typ not in grouped:
                 grouped[typ] = {
                     "type": typ,
+                    "type_name": type_name,
                     "total": 0,
                     "split": []
                 }
 
             grouped[typ]["split"].append({
                 "code": code,
-                "currency_name": name,
+                "currency_name": currency_name,
                 "amount": amount
             })
 
