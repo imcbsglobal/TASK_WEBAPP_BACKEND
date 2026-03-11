@@ -31,7 +31,7 @@ urlpatterns = [
     path('api/', include('pdc.urls')),
     path('api/', include('refresh_tag.urls')),
     path('api/', include('stock_report.urls')),
-    path('api/', include('type_wise_sales_today.urls')),
+    # path('api/', include('type_wise_sales_today.urls')),
     path('api/', include('tender_cash_byuser.urls')),
     path('api/', include('tender_cash_bytype.urls')),
     
