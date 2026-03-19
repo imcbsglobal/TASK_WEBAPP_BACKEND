@@ -1,6 +1,7 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import PDC
+from app1.models import AccMaster   # ✅ import acc master
 import jwt
 from django.conf import settings
 
@@ -29,18 +30,30 @@ def get_pdc(request):
 
     qs = PDC.objects.filter(client_id=client_id).order_by("-id")
 
-    data = [
-        {
+    # ✅ get all party codes
+    party_codes = [i.party for i in qs if i.party]
+
+    # ✅ fetch account names in single query
+    accounts = AccMaster.objects.filter(
+        code__in=party_codes,
+        client_id=client_id
+    )
+
+    # ✅ create map {code: name}
+    acc_map = {a.code: a.name for a in accounts}
+
+    data = []
+
+    for i in qs:
+        data.append({
             "colndate": i.colndate,
-            "party": i.party,
+            "party": acc_map.get(i.party, i.party),   # ✅ NAME instead of CODE
             "amount": i.amount,
             "chequedate": i.chequedate,
             "chequeno": i.chequeno,
             "colnstatus": i.colnstatus,
             "status": i.status,
-        }
-        for i in qs
-    ]
+        })
 
     return Response({
         "success": True,
