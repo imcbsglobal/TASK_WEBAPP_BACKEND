@@ -5,6 +5,7 @@ import jwt
 from .models import SalesDaywise, SalesMonthwise, SalesToday, PurchaseToday
 from .serializers import SalesDaywiseSerializer, SalesMonthwiseSerializer, SalesTodaySerializer, PurchaseTodaySerializer
 from datetime import datetime
+from django.db.models import Sum, Count
 try:
     # Python 3.9+
     from zoneinfo import ZoneInfo
@@ -193,6 +194,70 @@ def get_sales_monthwise(request):
     })
 
 
+@api_view(['GET'])
+def get_sale_report(request):
+    """
+    Returns individual sale records for the dashboard.
+    Returns sales from the last 30 days for the requesting client.
+    
+    Auth: Authorization: Bearer <jwt> (token must contain client_id)
+    
+    Response format:
+    {
+        "success": true,
+        "data": [
+            {
+                "id": 1,
+                "date": "2026-03-13",
+                "amount": 2500.00,
+                "total_amount": 2500.00,
+                "customer_id": 1,
+                "customername": "Customer Name",
+                "billno": 100,
+                "invdate": "2026-03-13"
+            },
+            ...
+        ]
+    }
+    """
+    from datetime import timedelta
+    
+    client_id, err = _decode_token_get_client_id(request)
+    if err:
+        return err
+
+    today = _current_date_in_kolkata()
+    thirty_days_ago = today - timedelta(days=30)
+    
+    # Get all sales from last 30 days
+    qs = SalesToday.objects.filter(
+        client_id=client_id,
+        invdate__gte=thirty_days_ago,
+        invdate__lte=today
+    ).order_by('-invdate', '-id')
+    
+    data = []
+    for sale in qs:
+        data.append({
+            'id': sale.id,
+            'date': sale.invdate.isoformat() if sale.invdate else None,
+            'sale_date': sale.invdate.isoformat() if sale.invdate else None,
+            'amount': float(sale.nettotal or 0),
+            'total_amount': float(sale.nettotal or 0),
+            'customer_id': sale.customername,
+            'customername': sale.customername,
+            'billno': sale.billno,
+            'invdate': sale.invdate.isoformat() if sale.invdate else None,
+            'userid': sale.userid
+        })
+    
+    return Response({
+        'success': True,
+        'total_records': len(data),
+        'data': data,
+    })
+
+
 
 
 
@@ -251,6 +316,73 @@ def get_sales_monthwise(request):
         -H "Authorization: Bearer YOUR_JWT_TOKEN"
 """
 
+
+@api_view(['GET'])
+def get_sales_today_usersummary(request):
+    """
+    Returns sales summary by user for today
+    
+    Auth: Authorization: Bearer <jwt> (token must contain client_id)
+    
+    Response format:
+    {
+        "success": true,
+        "date": "2026-03-18",
+        "total_users": 5,
+        "total_bills": 45,
+        "grand_total": 125000.00,
+        "data": [
+            {
+                "userid": "user1",
+                "username": "John Doe",
+                "total_amount": 25000.00,
+                "bill_count": 8
+            },
+            ...
+        ]
+    }
+    """
+    client_id, err = _decode_token_get_client_id(request)
+    if err:
+        return err
+
+    today = _current_date_in_kolkata()
+
+    qs = (
+        SalesToday.objects
+        .filter(client_id=client_id, invdate=today)
+        .values('userid')
+        .annotate(
+            total_amount=Sum('nettotal'),
+            bill_count=Count('id')
+        )
+        .order_by('-total_amount')
+    )
+
+    data = []
+    grand_total = 0
+    total_bills = 0
+
+    for row in qs:
+        amount = float(row['total_amount'] or 0)
+        grand_total += amount
+        total_bills += row['bill_count']
+
+        data.append({
+            "userid": row['userid'] or 'Unknown',
+            "total_amount": amount,
+            "bill_count": row['bill_count'],
+            "average_bill_value": amount / row['bill_count'] if row['bill_count'] > 0 else 0
+        })
+
+    return Response({
+        "success": True,
+        "date": today.isoformat(),
+        "total_users": len(data),
+        "total_bills": total_bills,
+        "grand_total": grand_total,
+        "data": data
+    })
 
 
 # jnk
