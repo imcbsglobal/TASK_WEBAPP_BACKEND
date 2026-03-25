@@ -9,3 +9,4 @@ urlpatterns = [
     path('get-sale-report/', views.get_sale_report, name='get_sale_report'),
     path('salestoday-usersummary/', views.get_sales_today_usersummary, name='get_sales_today_usersummary'),
 ]
+# s
