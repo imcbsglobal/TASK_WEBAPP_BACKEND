@@ -1,3 +1,4 @@
+from acc_sales_type.models import AccSalesType
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.conf import settings
@@ -57,7 +58,7 @@ from django.db.models import Sum, Count
 
 
 @api_view(['GET'])
-def get_sales_today(request):
+def get_sales_today_usersummary(request):
     """
     Returns USER wise sales summary for today
     """
@@ -171,24 +172,24 @@ def get_sales_daywise(request):
 
 @api_view(['GET'])
 def get_sales_monthwise(request):
+    """
+    Returns ALL monthwise sales data from DB
+    """
+
     client_id, err = _decode_token_get_client_id(request)
     if err:
         return err
 
-    year_param = request.GET.get('year')
-
-    qs = SalesMonthwise.objects.filter(client_id=client_id)
-
-    if year_param and year_param != 'all':
-        qs = qs.filter(year=year_param)
-
-    qs = qs.order_by('year', 'month_number')
+    qs = (
+        SalesMonthwise.objects
+        .filter(client_id=client_id)
+        .order_by('year', 'month_number')
+    )
 
     serializer = SalesMonthwiseSerializer(qs, many=True)
 
     return Response({
         'success': True,
-        'year': year_param if year_param else 'all',
         'total_records': qs.count(),
         'data': serializer.data,
     })
@@ -386,3 +387,108 @@ def get_sales_today_usersummary(request):
 
 
 # jnk
+
+from django.db.models import Sum, Count, OuterRef, Subquery
+
+@api_view(['GET'])
+def get_sales_today_typewise(request):
+    """
+    Returns SALE TYPE wise sales summary for today (with type name)
+    """
+
+    client_id, err = _decode_token_get_client_id(request)
+    if err:
+        return err
+
+    today = _current_date_in_kolkata()
+
+    # 🔥 Subquery to get type name
+    type_name_subquery = AccSalesType.objects.filter(
+        cd=OuterRef('type'),
+        client_id=client_id
+    ).values('name')[:1]
+
+    qs = (
+        SalesToday.objects
+        .filter(client_id=client_id, invdate=today)
+        .values('type')
+        .annotate(
+            type_name=Subquery(type_name_subquery),
+            total_amount=Sum('nettotal'),
+            bill_count=Count('id')
+        )
+        .order_by('type')
+    )
+
+    data = []
+    grand_total = 0
+    total_bills = 0
+
+    for row in qs:
+        amount = float(row['total_amount'] or 0)
+        grand_total += amount
+        total_bills += row['bill_count']
+
+        data.append({
+            "type": row['type'],
+            "type_name": row['type_name'],
+            "total_amount": amount,
+            "bill_count": row['bill_count']
+        })
+
+    return Response({
+        "success": True,
+        "date": today.isoformat(),
+        "total_types": len(data),
+        "total_bills": total_bills,
+        "grand_total": grand_total,
+        "data": data
+    })
+
+
+
+@api_view(['GET'])
+def get_sales_today_details(request):
+    """
+    Returns bill level sales details for today
+    """
+
+    client_id, err = _decode_token_get_client_id(request)
+    if err:
+        return err
+
+    today = _current_date_in_kolkata()
+
+    qs = (
+        SalesToday.objects
+        .filter(client_id=client_id, invdate=today)
+        .values(
+            'customername',
+            'billno',
+            'userid',
+            'nettotal'
+        )
+        .order_by('-id')
+    )
+
+    data = []
+    grand_total = 0
+
+    for row in qs:
+        amount = float(row['nettotal'] or 0)
+        grand_total += amount
+
+        data.append({
+            "customername": row['customername'],
+            "billno": row['billno'],
+            "userid": row['userid'],
+            "nettotal": amount
+        })
+
+    return Response({
+        "success": True,
+        "date": today.isoformat(),
+        "total_bills": len(data),
+        "grand_total": grand_total,
+        "data": data
+    })
