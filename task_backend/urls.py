@@ -34,6 +34,7 @@ urlpatterns = [
     # path('api/', include('type_wise_sales_today.urls')),
     path('api/', include('tender_cash_byuser.urls')),
     path('api/', include('tender_cash_bytype.urls')),
+    path("api/", include("stock_summary.urls")),
     
     
 

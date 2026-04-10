@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'pdc',
     'refresh_tag',
     'stock_report',
+    'stock_summary',
     'tendercash',
     'type_wise_sales_today',
     'tender_cash_byuser',
