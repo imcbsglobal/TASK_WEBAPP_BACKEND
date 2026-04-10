@@ -124,3 +124,41 @@ class PurchaseMonthwise(models.Model):
         indexes = [
             models.Index(fields=['client_id', 'year', 'month_number']),
         ]
+
+
+
+
+class SalesReturnDaywise(models.Model):
+    """Sales return summary by date for last 8 days"""
+    id = models.AutoField(primary_key=True)
+    date = models.DateField()
+    total_bills = models.IntegerField(default=0)
+    total_amount = models.DecimalField(max_digits=15, decimal_places=3, default=0)
+    client_id = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'salesreturn_daywise'
+        managed = True
+        unique_together = ('date', 'client_id')
+        indexes = [
+            models.Index(fields=['client_id', 'date']),
+        ]
+
+
+class SalesReturnMonthwise(models.Model):
+    """Sales return summary by month for current financial year"""
+    id = models.AutoField(primary_key=True)
+    month_name = models.CharField(max_length=20)   # e.g. "April 2025"
+    month_number = models.IntegerField()            # 1-12
+    year = models.IntegerField()
+    total_bills = models.IntegerField(default=0)
+    total_amount = models.DecimalField(max_digits=15, decimal_places=3, default=0)
+    client_id = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'salesreturn_monthwise'
+        managed = True
+        unique_together = ('month_number', 'year', 'client_id')
+        indexes = [
+            models.Index(fields=['client_id', 'year', 'month_number']),
+        ]

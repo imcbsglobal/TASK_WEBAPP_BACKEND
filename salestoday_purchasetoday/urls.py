@@ -13,5 +13,7 @@ urlpatterns = [
 
     path('purchasedaywise/', views.get_purchase_daywise, name='get_purchase_daywise'),
     path('purchasemonthwise/', views.get_purchase_monthwise, name='get_purchase_monthwise'),
+    path('salesreturndaywise/', views.get_salesreturn_daywise, name='get_salesreturn_daywise'),
+    path('salesreturnmonthwise/', views.get_salesreturn_monthwise, name='get_salesreturn_monthwise'),
 ]
 # s

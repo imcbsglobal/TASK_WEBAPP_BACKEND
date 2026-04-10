@@ -554,3 +554,72 @@ def get_purchase_monthwise(request):
         'total_records': qs.count(),
         'data': data,
     })
+
+
+
+@api_view(['GET'])
+def get_salesreturn_daywise(request):
+    """
+    Returns SalesReturnDaywise records for the requesting client's client_id.
+    Returns last 8 days of sales return summary.
+    """
+    client_id, err = _decode_token_get_client_id(request)
+    if err:
+        return err
+
+    from .models import SalesReturnDaywise
+
+    qs = SalesReturnDaywise.objects.filter(
+        client_id=client_id
+    ).order_by('-date')
+
+    data = []
+    for row in qs:
+        data.append({
+            'id': row.id,
+            'date': row.date.isoformat() if row.date else None,
+            'total_bills': row.total_bills,
+            'total_amount': float(row.total_amount or 0),
+            'client_id': row.client_id,
+        })
+
+    return Response({
+        'success': True,
+        'total_records': qs.count(),
+        'data': data,
+    })
+
+
+@api_view(['GET'])
+def get_salesreturn_monthwise(request):
+    """
+    Returns SalesReturnMonthwise records for the requesting client's client_id.
+    Returns full financial year sales return monthwise summary.
+    """
+    client_id, err = _decode_token_get_client_id(request)
+    if err:
+        return err
+
+    from .models import SalesReturnMonthwise
+
+    qs = SalesReturnMonthwise.objects.filter(
+        client_id=client_id
+    ).order_by('year', 'month_number')
+
+    data = []
+    for row in qs:
+        data.append({
+            'id': row.id,
+            'month_name': row.month_name,
+            'month_number': row.month_number,
+            'year': row.year,
+            'total_bills': row.total_bills,
+            'total_amount': float(row.total_amount or 0),
+            'client_id': row.client_id,
+        })
+
+    return Response({
+        'success': True,
+        'total_records': qs.count(),
+        'data': data,
+    })
