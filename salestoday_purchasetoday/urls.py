@@ -10,5 +10,8 @@ urlpatterns = [
     path('salestoday-usersummary/', views.get_sales_today_usersummary, name='get_sales_today_usersummary'),
     path('salestoday-typewise/', views.get_sales_today_typewise, name='get_sales_today_typewise'),
     path('salestoday-details/', views.get_sales_today_details, name='get_sales_today_details'),
+
+    path('purchasedaywise/', views.get_purchase_daywise, name='get_purchase_daywise'),
+    path('purchasemonthwise/', views.get_purchase_monthwise, name='get_purchase_monthwise'),
 ]
 # s

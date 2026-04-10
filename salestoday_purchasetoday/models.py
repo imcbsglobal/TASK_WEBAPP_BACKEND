@@ -85,3 +85,42 @@ class SalesMonthwise(models.Model):
 
     def __str__(self):
         return f"{self.month_name} - {self.total_bills} bills - ₹{self.total_amount}"
+    
+
+
+
+
+class PurchaseDaywise(models.Model):
+    """Purchase summary by date for last 8 days"""
+    id = models.AutoField(primary_key=True)
+    date = models.DateField()
+    total_bills = models.IntegerField(default=0)
+    total_amount = models.DecimalField(max_digits=15, decimal_places=3, default=0)
+    client_id = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'purchase_daywise'
+        managed = True
+        unique_together = ('date', 'client_id')
+        indexes = [
+            models.Index(fields=['client_id', 'date']),
+        ]
+
+
+class PurchaseMonthwise(models.Model):
+    """Purchase summary by month for current financial year"""
+    id = models.AutoField(primary_key=True)
+    month_name = models.CharField(max_length=20)
+    month_number = models.IntegerField()
+    year = models.IntegerField()
+    total_bills = models.IntegerField(default=0)
+    total_amount = models.DecimalField(max_digits=15, decimal_places=3, default=0)
+    client_id = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'purchase_monthwise'
+        managed = True
+        unique_together = ('month_number', 'year', 'client_id')
+        indexes = [
+            models.Index(fields=['client_id', 'year', 'month_number']),
+        ]
