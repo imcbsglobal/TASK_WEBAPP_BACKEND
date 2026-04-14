@@ -41,6 +41,8 @@ def get_stock_report(request):
             "bmrp": i.bmrp,
             "salesprice": i.salesprice,
             "quantity": i.quantity,
+            "cost": i.cost,  # Added
+
         }
         for i in qs
     ]

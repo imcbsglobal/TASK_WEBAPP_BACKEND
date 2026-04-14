@@ -13,6 +13,7 @@ class StockReport(models.Model):
     bmrp = models.DecimalField(max_digits=15, decimal_places=5, null=True, blank=True)
     salesprice = models.DecimalField(max_digits=15, decimal_places=5, null=True, blank=True)
     quantity = models.DecimalField(max_digits=15, decimal_places=5, null=True, blank=True)
+    cost = models.DecimalField(max_digits=15, decimal_places=5, null=True, blank=True)
 
     class Meta:
         db_table = "stock_report"
